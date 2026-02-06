@@ -1,0 +1,176 @@
+"""Byte Pair Encoder (BPE) implementation."""
+
+import logging
+from collections import Counter
+from dataclasses import dataclass
+from itertools import chain
+from typing import TYPE_CHECKING, NamedTuple
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable, Iterator
+
+Symbol = str
+
+logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class Word:
+    """Represents a word composed of symbols."""
+
+    symbols: list[Symbol]
+
+    def merge_pairs(self, rules: list[Bigram]) -> Word:
+        """Merge adjacent pairs of symbols according to the given rules."""
+        raise NotImplementedError
+
+    def count_pairs(self) -> Counter[Bigram]:
+        """Count the occurrences of adjacent pairs of symbols in the word."""
+        counts = Counter()
+        for index in range(len(self) - 1):
+            pair = Bigram(self[index], self[index + 1])
+            counts[pair] += 1
+        return counts
+
+    def __str__(self) -> str:
+        """Return the string representation of the word."""
+        return "".join(self.symbols)
+
+    def __iter__(self) -> Iterator:
+        """Return an iterator over the symbols in the word."""
+        return iter(self.symbols)
+
+    def __len__(self) -> int:
+        """Return the number of symbols in the word."""
+        return len(self.symbols)
+
+    def __getitem__(self, index: int) -> Symbol:
+        """Return the symbol at the given index."""
+        return self.symbols[index]
+
+    @staticmethod
+    def from_str(word: str, end_token: str = "</w>") -> Word:  # noqa: S107
+        """Create a Word object from a string."""
+        return Word(symbols=[*list(word), end_token])
+
+
+class Bigram(NamedTuple):
+    """A bigram is a pair of symbols."""
+
+    left: Symbol
+    right: Symbol
+
+    @property
+    def merged(self) -> Symbol:
+        """Return the merged symbol."""
+        return self.left + self.right
+
+
+class BytePairEncoder:
+    """Byte Pair Encoder (BPE) is a subword tokenization algorithm."""
+
+    def __init__(
+        self, vocab: list[Symbol] | None = None, rules: list[Bigram] | None = None
+    ) -> None:
+        """Initialize the BytePairEncoder.
+
+        Args:
+            vocab: The vocabulary of symbols.
+            rules: The rules for merging adjacent symbols.
+        """
+        self.vocab = [] if vocab is None else vocab
+        self.rules = [] if rules is None else rules
+
+    def train(
+        self, corpus: Iterable[str], max_vocab: int, max_iter: int = 100000
+    ) -> None:
+        """Learn new vocabulary and merge rules from the corpus.
+
+        Args:
+            corpus: A text corpus to train the vocabulary and merge rules.
+            max_vocab: Continue training till the vocabulary size reaches max_vocab.
+            max_iter: Termination condition when max_vocab is not reached.
+        """
+        # Flatten the corpus into a list of words
+        corpus_words = list(
+            chain.from_iterable(
+                [BytePairEncoder.pre_tokenize(text_chunk) for text_chunk in corpus]
+            )
+        )
+
+        for _ in range(max_iter):
+            if len(self.vocab) >= max_vocab:
+                return
+            corpus_words = self._train_step(corpus_words)
+
+        logger.warning(
+            "Training reached maximum iterations without "
+            "reaching the desired vocabulary size. "
+            "Current vocabulary size: %d, desired size: %d",
+            len(self.vocab),
+            max_vocab,
+        )
+
+    def _train_step(self, corpus: list[Word]) -> list[Word]:
+        """Learn a new merge rule from the corpus.
+
+        Args:
+            corpus: The list of all words in the corpus.
+
+        Returns:
+            The updated corpus with the new merge rule applied.
+        """
+        pair = BytePairEncoder.find_most_frequent_pair(corpus)
+        self.rules.append(pair)
+        self.vocab.append(pair.merged)
+
+        return [word.merge_pairs([pair]) for word in corpus]
+
+    @staticmethod
+    def find_most_frequent_pair(corpus: list[Word]) -> Bigram:
+        """Find the most frequent pair of adjacent symbols in a corpus.
+
+        Args:
+            corpus: The list of words in the whole corpus.
+
+        Returns:
+            The most frequent pair of adjacent symbols.
+        """
+        word_counts = BytePairEncoder.count_words(corpus)
+        pair_counts = BytePairEncoder.count_bigrams(word_counts)
+        return pair_counts.most_common(1)[0][0]
+
+    @staticmethod
+    def pre_tokenize(text_chunk: str) -> list[Word]:
+        """Split a text chunk into words.
+
+        Args:
+            text_chunk: A text chunk to split into words.
+        """
+        return [Word.from_str(w) for w in text_chunk.split()]
+
+    @staticmethod
+    def count_words(words: list[Word]) -> Counter[Word]:
+        """Count the number of occurrences of each word.
+
+        Args:
+            words: A list of words to count.
+        """
+        return Counter(words)
+
+    @staticmethod
+    def count_bigrams(word_counts: Counter[Word]) -> Counter[Bigram]:
+        """Count the number of adjacent symbol pair occurrences in words.
+
+        Args:
+            word_counts: A counter for the number of occurrences of each word.
+        """
+        counts = Counter()
+        for word, word_occurences in word_counts.items():
+            pair_counts_in_word = word.count_pairs()
+            new_pair_counts = {
+                k: v * word_occurences for k, v in pair_counts_in_word.items()
+            }
+            for pair, pair_occurence in new_pair_counts.items():
+                counts[pair] += pair_occurence
+        return counts
