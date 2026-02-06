@@ -21,8 +21,26 @@ class Word:
     symbols: list[Symbol]
 
     def merge_pairs(self, rules: list[Bigram]) -> Word:
-        """Merge adjacent pairs of symbols according to the given rules."""
-        raise NotImplementedError
+        """Merge adjacent pairs of symbols according to the given rules.
+
+        Args:
+            rules: A list of bigram rules to apply.
+
+        Returns:
+            A new Word object with the merged symbols.
+        """
+        word = Word(self.symbols.copy())
+        for rule in rules:
+            if left_index := word.symbols.index(rule.left):
+                right_index = left_index + 1
+                if (
+                    right_index < len(word.symbols)
+                    and word.symbols[right_index] == rule.right
+                ):
+                    left_hand = word.symbols[:left_index]
+                    right_hand = word.symbols[(right_index + 1) :]
+                    word = Word([*left_hand, rule.merged, *right_hand])
+        return word
 
     def count_pairs(self) -> Counter[Bigram]:
         """Count the occurrences of adjacent pairs of symbols in the word."""
@@ -92,11 +110,20 @@ class BytePairEncoder:
             max_iter: Termination condition when max_vocab is not reached.
         """
         # Flatten the corpus into a list of words
+        # The initial symbols are just characters.
         corpus_words = list(
             chain.from_iterable(
                 [BytePairEncoder.pre_tokenize(text_chunk) for text_chunk in corpus]
             )
         )
+
+        # Initialize vocabulary if it's empty with all characters in the corpus.
+        if len(self.vocab) == 0:
+            self.vocab = list(BytePairEncoder.get_corpus_symbols(corpus_words))
+
+        # If there are existing rules, merge corpus symbols accordingly.
+        if len(self.rules) > 0:
+            corpus_words = [word.merge_pairs(self.rules) for word in corpus_words]
 
         for _ in range(max_iter):
             if len(self.vocab) >= max_vocab:
@@ -125,6 +152,19 @@ class BytePairEncoder:
         self.vocab.append(pair.merged)
 
         return [word.merge_pairs([pair]) for word in corpus]
+
+    @staticmethod
+    def get_corpus_symbols(corpus: list[Word]) -> set[Symbol]:
+        """Get all symbols from a corpus.
+
+        Args:
+            corpus: The list of all words in the whole corpus.
+
+        Returns:
+            All unique symbols in the corpus.
+        """
+        corpus_symbols = chain.from_iterable([word.symbols for word in corpus])
+        return set(corpus_symbols)
 
     @staticmethod
     def find_most_frequent_pair(corpus: list[Word]) -> Bigram:
