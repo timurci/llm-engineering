@@ -1,9 +1,11 @@
 """Byte Pair Encoder (BPE) implementation."""
 
+import json
 import logging
 from collections import Counter
 from dataclasses import dataclass
 from itertools import chain
+from pathlib import Path  # noqa: TC003
 from typing import TYPE_CHECKING, NamedTuple
 
 if TYPE_CHECKING:
@@ -272,3 +274,42 @@ class BytePairEncoder:
             for pair, pair_occurence in new_pair_counts.items():
                 counts[pair] += pair_occurence
         return counts
+
+
+class BytePairEncoderJSONRepository:
+    """JSON repository for persisting and loading BytePairEncoder."""
+
+    @staticmethod
+    def save(encoder: BytePairEncoder, path: Path) -> None:
+        """Save encoder to JSON file.
+
+        Args:
+            encoder: The BytePairEncoder to serialize.
+            path: Path to the output JSON file.
+        """
+        data = {
+            "vocab": encoder.vocab,
+            "rules": [[r.left, r.right] for r in encoder.rules],
+            "end_token": encoder.end_token,
+            "unknown_token": encoder.unknown_token,
+        }
+        path.write_text(json.dumps(data, indent=2))
+
+    @staticmethod
+    def load(path: Path) -> BytePairEncoder:
+        """Load encoder from JSON file.
+
+        Args:
+            path: Path to the input JSON file.
+
+        Returns:
+            A deserialized BytePairEncoder instance.
+        """
+        data = json.loads(path.read_text())
+        rules = [Bigram(left=r[0], right=r[1]) for r in data["rules"]]
+        return BytePairEncoder(
+            vocab=data["vocab"],
+            rules=rules,
+            end_token=data["end_token"],
+            unknown_token=data["unknown_token"],
+        )

@@ -1,8 +1,14 @@
 """Tests for Byte Pair Encoder (BPE) implementation."""
 
 from collections import Counter
+from pathlib import Path  # noqa: TC003
 
-from llm_engineering.tokenizer.bpe import Bigram, BytePairEncoder, Word
+from llm_engineering.tokenizer.bpe import (
+    Bigram,
+    BytePairEncoder,
+    BytePairEncoderJSONRepository,
+    Word,
+)
 
 
 class TestWord:
@@ -354,3 +360,34 @@ class TestBytePairEncoderInstanceMethods:
             Bigram("un", "</w>"),
             Bigram("h", "ug"),
         ]
+
+
+class TestBytePairEncoderJSONRepository:
+    """Tests for BytePairEncoderJSONRepository."""
+
+    def test_save_and_load_e2e(self, tmp_path: Path) -> None:
+        """Test end-to-end save and load functionality."""
+        # Create and train encoder
+        encoder = BytePairEncoder(
+            end_token="</w>",  # noqa: S106
+            unknown_token="<unk>",  # noqa: S106
+        )
+        corpus = ["hug"] * 10 + ["pug"] * 5
+        encoder.train(corpus, max_vocab=9)
+
+        # Save
+        save_path = tmp_path / "encoder.json"
+        BytePairEncoderJSONRepository.save(encoder, save_path)
+
+        # Load
+        loaded = BytePairEncoderJSONRepository.load(save_path)
+
+        # Verify properties match
+        assert loaded.vocab == encoder.vocab
+        assert loaded.rules == encoder.rules
+        assert loaded.end_token == encoder.end_token
+        assert loaded.unknown_token == encoder.unknown_token
+
+        # Verify functional equivalence
+        test_text = "hug pug"
+        assert loaded.encode(test_text) == encoder.encode(test_text)
