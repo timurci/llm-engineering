@@ -314,3 +314,43 @@ class TestBytePairEncoderInstanceMethods:
         assert len(result) == 1
         # "test" with rule "st" should become "t" + "e" + "st" + "</w>" = "test</w>"
         assert result[0] == "test</w>"
+
+    def test_train_multiple_steps(self) -> None:
+        """Test train method learns merge rules progressively from corpus."""
+        # Build corpus with word frequencies:
+        # hug x10, pug x5, pun x12, bun x4, hugs x5
+        corpus = ["hug"] * 10 + ["pug"] * 5 + ["pun"] * 12 + ["bun"] * 4 + ["hugs"] * 5
+
+        encoder = BytePairEncoder()
+
+        # Step 1: Learn "ug" - appears 20 times (hug*10 + pug*5 + hugs*5)
+        encoder.train(corpus, max_vocab=9)
+        assert len(encoder.vocab) == 9  # noqa: PLR2004
+        assert "ug" in encoder.vocab
+        assert Bigram("u", "g") in encoder.rules
+
+        # Step 2: Learn "un" - appears 16 times (pun*12 + bun*4)
+        encoder.train(corpus, max_vocab=10)
+        assert len(encoder.vocab) == 10  # noqa: PLR2004
+        assert "un" in encoder.vocab
+        assert Bigram("u", "n") in encoder.rules
+
+        # Step 3: Learn "un</w>" - appears 16 times (pun*12 + bun*4)
+        # Beats "hug" at 15 times (hug*10 + hugs*5)
+        encoder.train(corpus, max_vocab=11)
+        assert len(encoder.vocab) == 11  # noqa: PLR2004
+        assert "un</w>" in encoder.vocab
+        assert Bigram("un", "</w>") in encoder.rules
+
+        # Step 4: Learn "hug" - appears 15 times (hug*10 + hugs*5)
+        encoder.train(corpus, max_vocab=12)
+        assert len(encoder.vocab) == 12  # noqa: PLR2004
+        assert "hug" in encoder.vocab
+        assert Bigram("h", "ug") in encoder.rules
+
+        assert encoder.rules == [
+            Bigram("u", "g"),
+            Bigram("u", "n"),
+            Bigram("un", "</w>"),
+            Bigram("h", "ug"),
+        ]
