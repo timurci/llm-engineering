@@ -29,20 +29,23 @@ class Word:
         Returns:
             A new Word object with the merged symbols.
         """
-        word = Word(self.symbols.copy())
+        symbols = self.symbols.copy()
         for rule in rules:
-            if rule.left not in word.symbols:
-                continue
-            left_index = word.symbols.index(rule.left)
-            right_index = left_index + 1
-            if (
-                right_index < len(word.symbols)
-                and word.symbols[right_index] == rule.right
-            ):
-                left_hand = word.symbols[:left_index]
-                right_hand = word.symbols[(right_index + 1) :]
-                word = Word([*left_hand, rule.merged, *right_hand])
-        return word
+            new_symbols: list[Symbol] = []
+            index = 0
+            while index < len(symbols):
+                if (
+                    index + 1 < len(symbols)
+                    and symbols[index] == rule.left
+                    and symbols[index + 1] == rule.right
+                ):
+                    new_symbols.append(rule.merged)
+                    index += 2  # Skip the consumed pair
+                else:
+                    new_symbols.append(symbols[index])
+                    index += 1
+            symbols = new_symbols
+        return Word(symbols)
 
     def replace_missing_symbols(
         self, vocab: list[Symbol], missing_token: Symbol
