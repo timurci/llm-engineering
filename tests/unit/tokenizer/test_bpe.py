@@ -1,7 +1,7 @@
 """Tests for Byte Pair Encoder (BPE) implementation."""
 
 from collections import Counter
-from pathlib import Path  # noqa: TC003
+from typing import TYPE_CHECKING
 
 from llm_engineering.tokenizer.bpe import (
     Bigram,
@@ -9,6 +9,9 @@ from llm_engineering.tokenizer.bpe import (
     BytePairEncoderJSONRepository,
     Word,
 )
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 class TestWord:

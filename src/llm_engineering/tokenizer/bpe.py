@@ -5,11 +5,11 @@ import logging
 from collections import Counter
 from dataclasses import dataclass
 from itertools import chain
-from pathlib import Path  # noqa: TC003
 from typing import TYPE_CHECKING, NamedTuple
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Iterator
+    from pathlib import Path
 
 Symbol = str
 
