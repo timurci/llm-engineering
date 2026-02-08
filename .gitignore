@@ -9,3 +9,6 @@ wheels/
 # Virtual environment & setup
 .venv/
 uv.lock
+
+# Project output files
+projects/**/*.json
