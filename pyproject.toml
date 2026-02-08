@@ -30,7 +30,7 @@ ignore = ["COM812"]
 [tool.ruff.lint.pydocstyle]
 convention = "google"
 
-[tool.ruff.per-file-ignores]
+[tool.ruff.lint.per-file-ignores]
 "tests/**" = [
     "ANN201",  # require return type annotations
     "S101",  # prevent usage of assert

@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 class Word:
     """Represents a word composed of symbols."""
 
-    symbols: list[Symbol]
+    symbols: tuple[Symbol, ...]
 
     def merge_pairs(self, rules: list[Bigram]) -> Word:
         """Merge adjacent pairs of symbols according to the given rules.
@@ -29,7 +29,7 @@ class Word:
         Returns:
             A new Word object with the merged symbols.
         """
-        symbols = self.symbols.copy()
+        symbols = list(self.symbols)
         for rule in rules:
             new_symbols: list[Symbol] = []
             index = 0
@@ -45,7 +45,7 @@ class Word:
                     new_symbols.append(symbols[index])
                     index += 1
             symbols = new_symbols
-        return Word(symbols)
+        return Word(tuple(symbols))
 
     def replace_missing_symbols(
         self, vocab: list[Symbol], missing_token: Symbol
@@ -60,10 +60,10 @@ class Word:
             A new Word object with the replaced symbols.
         """
         return Word(
-            [
+            tuple(
                 missing_token if symbol not in vocab else symbol
                 for symbol in self.symbols
-            ]
+            )
         )
 
     def count_pairs(self) -> Counter[Bigram]:
@@ -93,7 +93,7 @@ class Word:
     @staticmethod
     def from_str(word: str, end_token: str = "</w>") -> Word:  # noqa: S107
         """Create a Word object from a string."""
-        return Word(symbols=[*list(word), end_token])
+        return Word(symbols=(*tuple(word), end_token))
 
 
 class Bigram(NamedTuple):
