@@ -31,15 +31,17 @@ class Word:
         """
         word = Word(self.symbols.copy())
         for rule in rules:
-            if left_index := word.symbols.index(rule.left):
-                right_index = left_index + 1
-                if (
-                    right_index < len(word.symbols)
-                    and word.symbols[right_index] == rule.right
-                ):
-                    left_hand = word.symbols[:left_index]
-                    right_hand = word.symbols[(right_index + 1) :]
-                    word = Word([*left_hand, rule.merged, *right_hand])
+            if rule.left not in word.symbols:
+                continue
+            left_index = word.symbols.index(rule.left)
+            right_index = left_index + 1
+            if (
+                right_index < len(word.symbols)
+                and word.symbols[right_index] == rule.right
+            ):
+                left_hand = word.symbols[:left_index]
+                right_hand = word.symbols[(right_index + 1) :]
+                word = Word([*left_hand, rule.merged, *right_hand])
         return word
 
     def replace_missing_symbols(
