@@ -42,6 +42,25 @@ class Word:
                     word = Word([*left_hand, rule.merged, *right_hand])
         return word
 
+    def replace_missing_symbols(
+        self, vocab: list[Symbol], missing_token: Symbol
+    ) -> Word:
+        """Replace unknown symbols with the missing token.
+
+        Args:
+            vocab: A list of known symbols.
+            missing_token: The token to replace unknown symbols with.
+
+        Returns:
+            A new Word object with the replaced symbols.
+        """
+        return Word(
+            [
+                missing_token if symbol not in vocab else symbol
+                for symbol in self.symbols
+            ]
+        )
+
     def count_pairs(self) -> Counter[Bigram]:
         """Count the occurrences of adjacent pairs of symbols in the word."""
         counts = Counter()
@@ -88,16 +107,43 @@ class BytePairEncoder:
     """Byte Pair Encoder (BPE) is a subword tokenization algorithm."""
 
     def __init__(
-        self, vocab: list[Symbol] | None = None, rules: list[Bigram] | None = None
+        self,
+        vocab: list[Symbol] | None = None,
+        rules: list[Bigram] | None = None,
+        end_token: str = "</w>",  # noqa: S107
+        unknown_token: str = "<unk>",  # noqa: S107
     ) -> None:
         """Initialize the BytePairEncoder.
 
         Args:
             vocab: The vocabulary of symbols.
             rules: The rules for merging adjacent symbols.
+            end_token: The token to use for end of word.
+            unknown_token: The token to use for unknown symbols.
         """
         self.vocab = [] if vocab is None else vocab
         self.rules = [] if rules is None else rules
+        self.unknown_token = unknown_token
+        self.end_token = end_token
+
+    def encode(self, text: str) -> list[str]:
+        """Encode a text string into a list of tokens using Byte Pair Encoding.
+
+        Args:
+            text: The input text string to be encoded.
+            unknown_token: The token to use for unknown symbols.
+
+        Returns:
+            A list of tokens representing the encoded text.
+        """
+        # Preprocess the text into a list of symbols
+        words = self.pre_tokenize(text)
+        words = self.merge_symbols(words)
+        words = [
+            word.replace_missing_symbols(self.vocab, self.unknown_token)
+            for word in words
+        ]
+        return [str(word) for word in words]
 
     def train(
         self, corpus: Iterable[str], max_vocab: int, max_iter: int = 100000
@@ -113,7 +159,7 @@ class BytePairEncoder:
         # The initial symbols are just characters.
         corpus_words = list(
             chain.from_iterable(
-                [BytePairEncoder.pre_tokenize(text_chunk) for text_chunk in corpus]
+                [self.pre_tokenize(text_chunk) for text_chunk in corpus]
             )
         )
 
@@ -123,7 +169,7 @@ class BytePairEncoder:
 
         # If there are existing rules, merge corpus symbols accordingly.
         if len(self.rules) > 0:
-            corpus_words = [word.merge_pairs(self.rules) for word in corpus_words]
+            corpus_words = self.merge_symbols(corpus_words)
 
         for _ in range(max_iter):
             if len(self.vocab) >= max_vocab:
@@ -151,7 +197,7 @@ class BytePairEncoder:
         self.rules.append(pair)
         self.vocab.append(pair.merged)
 
-        return [word.merge_pairs([pair]) for word in corpus]
+        return self.merge_symbols(corpus)
 
     @staticmethod
     def get_corpus_symbols(corpus: list[Word]) -> set[Symbol]:
@@ -180,14 +226,21 @@ class BytePairEncoder:
         pair_counts = BytePairEncoder.count_bigrams(word_counts)
         return pair_counts.most_common(1)[0][0]
 
-    @staticmethod
-    def pre_tokenize(text_chunk: str) -> list[Word]:
+    def pre_tokenize(self, text_chunk: str) -> list[Word]:
         """Split a text chunk into words.
 
         Args:
             text_chunk: A text chunk to split into words.
         """
-        return [Word.from_str(w) for w in text_chunk.split()]
+        return [Word.from_str(w, self.end_token) for w in text_chunk.split()]
+
+    def merge_symbols(self, words: list[Word]) -> list[Word]:
+        """Merge adjacent symbols in a word list according to the given rules.
+
+        Args:
+            words: A list of words to merge symbols in.
+        """
+        return [word.merge_pairs(self.rules) for word in words]
 
     @staticmethod
     def count_words(words: list[Word]) -> Counter[Word]:
