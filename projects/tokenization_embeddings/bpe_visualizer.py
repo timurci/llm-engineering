@@ -72,9 +72,11 @@ if __name__ == "__main__":
     config = VisualConfig(
         colors=cycle(
             [
-                EscapeSequence("\033[31m"),
-                EscapeSequence("\033[32m"),
-                EscapeSequence("\033[33m"),
+                EscapeSequence("\033[41m"),
+                EscapeSequence("\033[42m"),
+                EscapeSequence("\033[44m"),
+                EscapeSequence("\033[43m"),
+                EscapeSequence("\033[45m"),
             ]
         ),
         override_tokens={encoder.end_token: " ", encoder.unknown_token: "?"},
