@@ -9,7 +9,9 @@ authors = [
     { name = "Timur Çakmakoğlu", email = "timurcakmakoglu@gmail.com" }
 ]
 requires-python = ">=3.14"
-dependencies = []
+dependencies = [
+    "torch>=2.10.0",
+]
 
 [build-system]
 requires = ["uv_build>=0.9.17,<0.10.0"]
