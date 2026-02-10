@@ -278,9 +278,9 @@ class TestBytePairEncoderInstanceMethods:
         )
         result = encoder.encode("hello")
 
-        assert len(result) == 1
         # All characters in vocab, so no replacements needed
-        assert result[0] == "hello</w>"
+        # No merge rules, so symbols stay as individual characters
+        assert result == ["h", "e", "l", "l", "o", "</w>"]
 
     def test_encode_multiple_words(self) -> None:
         """Test encode with multiple words."""
@@ -292,9 +292,21 @@ class TestBytePairEncoderInstanceMethods:
         )
         result = encoder.encode("hello world")
 
-        assert len(result) == 2  # noqa: PLR2004
-        assert result[0] == "hello</w>"
-        assert result[1] == "world</w>"
+        # No merge rules, so each word's symbols are individual characters
+        assert result == [
+            "h",
+            "e",
+            "l",
+            "l",
+            "o",
+            "</w>",
+            "w",
+            "o",
+            "r",
+            "l",
+            "d",
+            "</w>",
+        ]
 
     def test_encode_with_unknown_symbols(self) -> None:
         """Test encode replaces unknown symbols."""
@@ -306,9 +318,9 @@ class TestBytePairEncoderInstanceMethods:
         )
         result = encoder.encode("hello")
 
-        assert len(result) == 1
         # 'o' should be replaced with <unk>
-        assert result[0] == "hell<unk></w>"
+        # No merge rules, so symbols stay as individual tokens
+        assert result == ["h", "e", "l", "l", "<unk>", "</w>"]
 
     def test_encode_with_merge_rules(self) -> None:
         """Test encode applies merge rules."""
@@ -320,9 +332,9 @@ class TestBytePairEncoderInstanceMethods:
         )
         result = encoder.encode("test")
 
-        assert len(result) == 1
-        # "test" with rule "st" should become "t" + "e" + "st" + "</w>" = "test</w>"
-        assert result[0] == "test</w>"
+        # "test" with rule "st" should become "t" + "e" + "st" + "</w>"
+        # Merge rules create "st" token, so result includes merged symbol
+        assert result == ["t", "e", "st", "</w>"]
 
     def test_train_multiple_steps(self) -> None:
         """Test train method learns merge rules progressively from corpus."""

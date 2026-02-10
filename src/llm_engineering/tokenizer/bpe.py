@@ -150,7 +150,7 @@ class BytePairEncoder:
             word.replace_missing_symbols(self.vocab, self.unknown_token)
             for word in words
         ]
-        return [str(word) for word in words]
+        return [symbol for word in words for symbol in word.symbols]
 
     def train(
         self, corpus: Iterable[str], max_vocab: int, max_iter: int = 100000
