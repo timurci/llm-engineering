@@ -224,6 +224,7 @@ class BytePairEncoder:
                 self.unknown_token,
                 *list(BytePairEncoder.get_corpus_symbols(corpus_words)),
             ]
+            logger.info("Initialized vocabulary with %d symbols", len(self.vocab))
 
         # If there are existing rules, merge corpus symbols accordingly.
         if len(self.rules) > 0:
@@ -233,6 +234,8 @@ class BytePairEncoder:
             if len(self.vocab) >= max_vocab:
                 return
             corpus_words = self._train_step(corpus_words)
+            complete_percent = len(self.vocab) / max_vocab * 100
+            logger.info("Training progress: %.2f%%", complete_percent)
 
         logger.warning(
             "Training reached maximum iterations without "
