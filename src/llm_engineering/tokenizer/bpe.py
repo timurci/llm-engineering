@@ -129,19 +129,42 @@ class BytePairEncoder:
             unknown_token: The token to use for unknown symbols.
         """
         self.vocab = [] if vocab is None else vocab
+        self._token_to_id_cache: dict[Symbol, int] = {}
         self.rules = [] if rules is None else rules
         self.unknown_token = unknown_token
         self.end_token = end_token
 
-    def encode(self, text: str) -> list[str]:
-        """Encode a text string into a list of tokens using Byte Pair Encoding.
+        if vocab is not None and unknown_token not in vocab:
+            logger.warning(
+                "Initial vocabulary does not contain the unknown token. "
+                "Appending the missing token '%s'.",
+                unknown_token,
+            )
+            self.vocab.append(unknown_token)
+
+    def __len__(self) -> int:
+        """Return the size of the vocabulary."""
+        return len(self.vocab)
+
+    def id_to_token(self, token_id: int) -> Symbol:
+        """Return the token with the given id."""
+        return self.vocab[token_id]
+
+    def token_to_id(self, token: Symbol) -> int:
+        """Return the id of the given token."""
+        if len(self.vocab) != len(self._token_to_id_cache):
+            self._token_to_id_cache = {v: i for i, v in enumerate(self.vocab)}
+        return self._token_to_id_cache[token]
+
+    def tokenize(self, text: str) -> list[Symbol]:
+        """Convert a text string into a list of tokens using Byte Pair Encoding.
 
         Args:
             text: The input text string to be encoded.
             unknown_token: The token to use for unknown symbols.
 
         Returns:
-            A list of tokens representing the encoded text.
+            A list of tokens representing the text.
         """
         # Preprocess the text into a list of symbols
         words = self.pre_tokenize(text)
@@ -151,6 +174,31 @@ class BytePairEncoder:
             for word in words
         ]
         return [symbol for word in words for symbol in word.symbols]
+
+    def encode(self, text: str) -> list[int]:
+        """Encode a text string into a list of token ids using Byte Pair Encoding.
+
+        Args:
+            text: The input text string to be encoded.
+
+        Returns:
+            A list of token indices representing the text.
+        """
+        # Preprocess the text into a list of symbols
+        tokens = self.tokenize(text)
+        return [self.token_to_id(token) for token in tokens]
+
+    def decode(self, token_ids: list[int]) -> str:
+        """Decode a list of token ids into a text string using Byte Pair Encoding.
+
+        Args:
+            token_ids: A list of token indices representing the text.
+
+        Returns:
+            The decoded text string.
+        """
+        tokens = [self.id_to_token(token_id) for token_id in token_ids]
+        return "".join([token.replace(self.end_token, " ") for token in tokens])
 
     def train(
         self, corpus: Iterable[str], max_vocab: int, max_iter: int = 100000
@@ -172,7 +220,10 @@ class BytePairEncoder:
 
         # Initialize vocabulary if it's empty with all characters in the corpus.
         if len(self.vocab) == 0:
-            self.vocab = list(BytePairEncoder.get_corpus_symbols(corpus_words))
+            self.vocab = [
+                self.unknown_token,
+                *list(BytePairEncoder.get_corpus_symbols(corpus_words)),
+            ]
 
         # If there are existing rules, merge corpus symbols accordingly.
         if len(self.rules) > 0:

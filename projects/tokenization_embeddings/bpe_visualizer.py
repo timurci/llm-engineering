@@ -47,7 +47,7 @@ def enrich_text(text: str, encoder: BytePairEncoder, config: VisualConfig) -> st
         encoder: BytePairEncoder instance.
         config: VisualConfig instance.
     """
-    encoded_text = encoder.encode(text)
+    encoded_text = encoder.tokenize(text)
     colors = config.colors
     enriched_text = ""
 

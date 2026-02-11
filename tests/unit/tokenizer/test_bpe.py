@@ -268,29 +268,29 @@ class TestBytePairEncoderInstanceMethods:
         assert "ab" in encoder.vocab
         assert Bigram("a", "b") in encoder.rules
 
-    def test_encode_simple(self) -> None:
-        """Test encode with simple text and vocab."""
+    def test_tokenize_simple(self) -> None:
+        """Test tokenize with simple text and vocab."""
         encoder = BytePairEncoder(
             vocab=["h", "e", "l", "o", "</w>"],
             rules=[],
             end_token="</w>",  # noqa: S106
             unknown_token="<unk>",  # noqa: S106
         )
-        result = encoder.encode("hello")
+        result = encoder.tokenize("hello")
 
         # All characters in vocab, so no replacements needed
         # No merge rules, so symbols stay as individual characters
         assert result == ["h", "e", "l", "l", "o", "</w>"]
 
-    def test_encode_multiple_words(self) -> None:
-        """Test encode with multiple words."""
+    def test_tokenize_multiple_words(self) -> None:
+        """Test tokenize with multiple words."""
         encoder = BytePairEncoder(
             vocab=["h", "e", "l", "o", "w", "r", "d", "</w>"],
             rules=[],
             end_token="</w>",  # noqa: S106
             unknown_token="<unk>",  # noqa: S106
         )
-        result = encoder.encode("hello world")
+        result = encoder.tokenize("hello world")
 
         # No merge rules, so each word's symbols are individual characters
         assert result == [
@@ -308,29 +308,29 @@ class TestBytePairEncoderInstanceMethods:
             "</w>",
         ]
 
-    def test_encode_with_unknown_symbols(self) -> None:
-        """Test encode replaces unknown symbols."""
+    def test_tokenize_with_unknown_symbols(self) -> None:
+        """Test tokenize replaces unknown symbols."""
         encoder = BytePairEncoder(
             vocab=["h", "e", "l", "</w>"],  # 'o' is not in vocab
             rules=[],
             end_token="</w>",  # noqa: S106
             unknown_token="<unk>",  # noqa: S106
         )
-        result = encoder.encode("hello")
+        result = encoder.tokenize("hello")
 
         # 'o' should be replaced with <unk>
         # No merge rules, so symbols stay as individual tokens
         assert result == ["h", "e", "l", "l", "<unk>", "</w>"]
 
-    def test_encode_with_merge_rules(self) -> None:
-        """Test encode applies merge rules."""
+    def test_tokenize_with_merge_rules(self) -> None:
+        """Test tokenize applies merge rules."""
         encoder = BytePairEncoder(
             vocab=["t", "e", "</w>", "st"],
             rules=[Bigram("s", "t")],
             end_token="</w>",  # noqa: S106
             unknown_token="<unk>",  # noqa: S106
         )
-        result = encoder.encode("test")
+        result = encoder.tokenize("test")
 
         # "test" with rule "st" should become "t" + "e" + "st" + "</w>"
         # Merge rules create "st" token, so result includes merged symbol
@@ -345,27 +345,27 @@ class TestBytePairEncoderInstanceMethods:
         encoder = BytePairEncoder()
 
         # Step 1: Learn "ug" - appears 20 times (hug*10 + pug*5 + hugs*5)
-        encoder.train(corpus, max_vocab=9)
-        assert len(encoder.vocab) == 9  # noqa: PLR2004
+        encoder.train(corpus, max_vocab=10)
+        assert len(encoder.vocab) == 10  # noqa: PLR2004
         assert "ug" in encoder.vocab
         assert Bigram("u", "g") in encoder.rules
 
         # Step 2: Learn "un" - appears 16 times (pun*12 + bun*4)
-        encoder.train(corpus, max_vocab=10)
-        assert len(encoder.vocab) == 10  # noqa: PLR2004
+        encoder.train(corpus, max_vocab=11)
+        assert len(encoder.vocab) == 11  # noqa: PLR2004
         assert "un" in encoder.vocab
         assert Bigram("u", "n") in encoder.rules
 
         # Step 3: Learn "un</w>" - appears 16 times (pun*12 + bun*4)
         # Beats "hug" at 15 times (hug*10 + hugs*5)
-        encoder.train(corpus, max_vocab=11)
-        assert len(encoder.vocab) == 11  # noqa: PLR2004
+        encoder.train(corpus, max_vocab=12)
+        assert len(encoder.vocab) == 12  # noqa: PLR2004
         assert "un</w>" in encoder.vocab
         assert Bigram("un", "</w>") in encoder.rules
 
         # Step 4: Learn "hug" - appears 15 times (hug*10 + hugs*5)
-        encoder.train(corpus, max_vocab=12)
-        assert len(encoder.vocab) == 12  # noqa: PLR2004
+        encoder.train(corpus, max_vocab=13)
+        assert len(encoder.vocab) == 13  # noqa: PLR2004
         assert "hug" in encoder.vocab
         assert Bigram("h", "ug") in encoder.rules
 
