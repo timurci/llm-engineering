@@ -45,7 +45,6 @@ class BigramEmbeddingTrainer:
         model: EmbeddingModel,
         optimizer: torch.optim.Optimizer,
         loss_fn: LossFunction | None = None,
-        experiment_trackers: list[ExperimentTracker] | None = None,
     ) -> None:
         """Initialize the trainer.
 
@@ -53,12 +52,10 @@ class BigramEmbeddingTrainer:
             model: The embedding model to train.
             optimizer: The optimizer to use for training.
             loss_fn: The loss function to use for training.
-            experiment_trackers: Experiment trackers to use during training.
         """
         self.model = model
         self.optimizer = optimizer
         self.loss_fn = loss_fn or nn.CrossEntropyLoss()
-        self.experiment_trackers = experiment_trackers or []
 
     def _train_epoch(
         self, loader: DataLoader[TokenIndexBigram], device: torch.device
@@ -132,6 +129,7 @@ class BigramEmbeddingTrainer:
         device: torch.device,
         epochs: int,
         val_loader: DataLoader[TokenIndexBigram] | None = None,
+        experiment_trackers: list[ExperimentTracker] | None = None,
     ) -> None:
         """Train the model for a given number of epochs.
 
@@ -140,12 +138,14 @@ class BigramEmbeddingTrainer:
             device: The device to load the data.
             epochs: The number of epochs to train for.
             val_loader: The data loader for the validation data.
+            experiment_trackers: The experiment trackers to log metrics.
         """
+        experiment_trackers = experiment_trackers or []
         for epoch in range(1, epochs + 1):
             train_metrics = self._train_epoch(train_loader, device)
-            for tracker in self.experiment_trackers:
+            for tracker in experiment_trackers:
                 tracker.log_metrics(Phase.TRAIN, epoch, train_metrics._asdict())
             if val_loader is not None:
                 val_metrics = self._validate_epoch(val_loader, device)
-                for tracker in self.experiment_trackers:
+                for tracker in experiment_trackers:
                     tracker.log_metrics(Phase.VAL, epoch, val_metrics._asdict())
