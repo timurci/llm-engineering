@@ -258,15 +258,16 @@ class TestBytePairEncoderInstanceMethods:
         word1 = Word(symbols=("a", "b", "c"))
         word2 = Word(symbols=("a", "b", "d"))
         word_counts = Counter([word1, word2])
+        pair_counts = BytePairEncoder.count_bigrams(word_counts)
 
         initial_rules_count = len(encoder.rules)
         initial_vocab_count = len(encoder.vocab)
 
-        result = encoder._train_step(word_counts)
+        result_word_counts, _pair_counts = encoder._train_step(word_counts, pair_counts)
 
         assert len(encoder.rules) == initial_rules_count + 1
         assert len(encoder.vocab) == initial_vocab_count + 1
-        assert len(result) == len(word_counts)  # Same number of unique words returned
+        assert len(result_word_counts) == len(word_counts)
         assert "ab" in encoder.vocab
         assert Bigram("a", "b") in encoder.rules
 

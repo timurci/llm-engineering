@@ -18,7 +18,7 @@ logging.basicConfig(level=logging.INFO)
 def main() -> None:
     """Train a BPE tokenizer and save it to disk."""
     dataset = load_dataset(DATASET_NAME, DATASET_CONFIG, split="train")
-    corpus = (sample["text"] for sample in dataset if sample["text"])  # type: ignore[index]
+    corpus = (sample["text"] for sample in dataset if sample["text"])
 
     encoder = BytePairEncoder()
     encoder.train(corpus, max_vocab=MAX_VOCAB_SIZE)
