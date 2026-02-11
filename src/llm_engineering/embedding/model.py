@@ -14,6 +14,25 @@ class EmbeddingModel(Protocol):
         """Encoder module."""
         ...
 
+    def __call__(self, x: torch.Tensor) -> torch.Tensor:
+        """Forward pass of the embedding model.
+
+        Args:
+            x (torch.Tensor): Input tensor of shape (batch_size, 1).
+
+        Returns:
+            torch.Tensor: Output tensor of shape (batch_size, vocab_size).
+        """
+        ...
+
+    def train(self) -> None:
+        """Set model to training mode."""
+        ...
+
+    def eval(self) -> None:
+        """Set model to evaluation mode."""
+        ...
+
 
 class BigramEmbeddingModel(nn.Module):
     """Embedding model for simple bigram next word prediction."""

@@ -1,11 +1,11 @@
 """Training module for embedding model."""
 
-from dataclasses import dataclass
-from enum import StrEnum
 from typing import TYPE_CHECKING, NamedTuple, Protocol
 
 import torch
 from torch import nn
+
+from llm_engineering.core.trackers import ExperimentTracker, Phase
 
 if TYPE_CHECKING:
     from torch.utils.data import DataLoader
@@ -30,26 +30,9 @@ class LossFunction(Protocol):
         ...
 
 
-class TrainingPhase(StrEnum):
-    """Training phase enum."""
-
-    TRAINING = "training"
-    VALIDATION = "validation"
-
-
 class ClassificationScore(NamedTuple):
     """Classification metrics for one epoch."""
 
-    loss: float
-    accuracy: float
-
-
-@dataclass(frozen=True)
-class TrainingHistoryItem:
-    """History item for one epoch."""
-
-    phase: TrainingPhase
-    epoch: int
     loss: float
     accuracy: float
 
@@ -62,6 +45,7 @@ class BigramEmbeddingTrainer:
         model: EmbeddingModel,
         optimizer: torch.optim.Optimizer,
         loss_fn: LossFunction | None = None,
+        experiment_trackers: list[ExperimentTracker] | None = None,
     ) -> None:
         """Initialize the trainer.
 
@@ -69,10 +53,12 @@ class BigramEmbeddingTrainer:
             model: The embedding model to train.
             optimizer: The optimizer to use for training.
             loss_fn: The loss function to use for training.
+            experiment_trackers: Experiment trackers to use during training.
         """
         self.model = model
         self.optimizer = optimizer
-        self.loss_fn = nn.CrossEntropyLoss() if loss_fn is None else loss_fn
+        self.loss_fn = loss_fn or nn.CrossEntropyLoss()
+        self.experiment_trackers = experiment_trackers or []
 
     def _train_epoch(
         self, loader: DataLoader[TokenIndexBigram], device: torch.device
@@ -86,7 +72,28 @@ class BigramEmbeddingTrainer:
         Returns:
             A classification score for the epoch.
         """
-        raise NotImplementedError
+        self.model.train()
+        total_loss = 0.0
+        total_correct = 0
+        total_samples = 0
+        for batch in loader:
+            self.optimizer.zero_grad()
+
+            inputs = batch["left"].to(device)
+            targets = batch["right"].to(device)
+            outputs = self.model(inputs)
+
+            loss = self.loss_fn(outputs, targets)
+            loss.backward()
+            self.optimizer.step()
+
+            total_loss += loss.item()
+            total_correct += (outputs.argmax(dim=1) == targets).sum().item()
+            total_samples += inputs.size(0)
+        return ClassificationScore(
+            loss=(total_loss / total_samples),
+            accuracy=(total_correct / total_samples),
+        )
 
     def _validate_epoch(
         self, loader: DataLoader[TokenIndexBigram], device: torch.device
@@ -100,7 +107,24 @@ class BigramEmbeddingTrainer:
         Returns:
             A classification score for the epoch.
         """
-        raise NotImplementedError
+        self.model.eval()
+        total_loss = 0.0
+        total_correct = 0
+        total_samples = 0
+        with torch.inference_mode():
+            for batch in loader:
+                inputs = batch["left"].to(device)
+                targets = batch["right"].to(device)
+                outputs = self.model(inputs)
+
+                loss = self.loss_fn(outputs, targets)
+                total_loss += loss.item()
+                total_correct += (outputs.argmax(dim=1) == targets).sum().item()
+                total_samples += inputs.size(0)
+        return ClassificationScore(
+            loss=(total_loss / total_samples),
+            accuracy=(total_correct / total_samples),
+        )
 
     def train(
         self,
@@ -108,8 +132,7 @@ class BigramEmbeddingTrainer:
         device: torch.device,
         epochs: int,
         val_loader: DataLoader[TokenIndexBigram] | None = None,
-        logging_interval: int = 100,
-    ) -> list[TrainingHistoryItem]:
+    ) -> None:
         """Train the model for a given number of epochs.
 
         Args:
@@ -117,9 +140,12 @@ class BigramEmbeddingTrainer:
             device: The device to load the data.
             epochs: The number of epochs to train for.
             val_loader: The data loader for the validation data.
-            logging_interval: The interval at which to log training progress.
-
-        Returns:
-            A list of training history items.
         """
-        raise NotImplementedError
+        for epoch in range(1, epochs + 1):
+            train_metrics = self._train_epoch(train_loader, device)
+            for tracker in self.experiment_trackers:
+                tracker.log_metrics(Phase.TRAIN, epoch, train_metrics._asdict())
+            if val_loader is not None:
+                val_metrics = self._validate_epoch(val_loader, device)
+                for tracker in self.experiment_trackers:
+                    tracker.log_metrics(Phase.VAL, epoch, val_metrics._asdict())
