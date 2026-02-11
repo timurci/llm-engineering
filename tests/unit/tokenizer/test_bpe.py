@@ -129,20 +129,20 @@ class TestBytePairEncoderStaticMethods:
 
     def test_get_corpus_symbols_empty(self) -> None:
         """Test get_corpus_symbols with empty corpus."""
-        assert BytePairEncoder.get_corpus_symbols([]) == set()
+        assert BytePairEncoder.get_corpus_symbols(set()) == set()
 
     def test_get_corpus_symbols_single_word(self) -> None:
         """Test get_corpus_symbols with single word."""
-        corpus = [Word(symbols=("a", "b", "c"))]
+        corpus = {Word(symbols=("a", "b", "c"))}
         assert BytePairEncoder.get_corpus_symbols(corpus) == {"a", "b", "c"}
 
     def test_get_corpus_symbols_multiple_words(self) -> None:
         """Test get_corpus_symbols with multiple words and duplicates."""
-        corpus = [
+        corpus = {
             Word(symbols=("a", "b", "c")),
             Word(symbols=("b", "c", "d")),
             Word(symbols=("c", "d", "e")),
-        ]
+        }
         assert BytePairEncoder.get_corpus_symbols(corpus) == {"a", "b", "c", "d", "e"}
 
     def test_count_words_empty(self) -> None:
@@ -183,9 +183,9 @@ class TestBytePairEncoderStaticMethods:
         """Test find_most_frequent_pair with clear winner."""
         word1 = Word(symbols=("a", "b", "c"))
         word2 = Word(symbols=("a", "b", "d"))
-        corpus = [word1, word2]
+        word_counts = Counter([word1, word2])
 
-        result = BytePairEncoder.find_most_frequent_pair(corpus)
+        result = BytePairEncoder.find_most_frequent_pair(word_counts)
         assert result == Bigram("a", "b")  # Appears in both words
 
     def test_find_most_frequent_pair_tied(self) -> None:
@@ -193,9 +193,9 @@ class TestBytePairEncoderStaticMethods:
         word1 = Word(symbols=("a", "b"))
         word2 = Word(symbols=("c", "d"))
         word3 = Word(symbols=("e", "f"))
-        corpus = [word1, word2, word3, word1, word2]
+        word_counts = Counter([word1, word2, word3, word1, word2])
 
-        result = BytePairEncoder.find_most_frequent_pair(corpus)
+        result = BytePairEncoder.find_most_frequent_pair(word_counts)
         # Both pairs appear once, most_common(1) returns first encountered
         assert result in {Bigram("a", "b"), Bigram("c", "d")}
 
@@ -257,16 +257,16 @@ class TestBytePairEncoderInstanceMethods:
         encoder = BytePairEncoder()
         word1 = Word(symbols=("a", "b", "c"))
         word2 = Word(symbols=("a", "b", "d"))
-        corpus = [word1, word2]
+        word_counts = Counter([word1, word2])
 
         initial_rules_count = len(encoder.rules)
         initial_vocab_count = len(encoder.vocab)
 
-        result = encoder._train_step(corpus)
+        result = encoder._train_step(word_counts)
 
         assert len(encoder.rules) == initial_rules_count + 1
         assert len(encoder.vocab) == initial_vocab_count + 1
-        assert len(result) == len(corpus)  # Same number of words returned
+        assert len(result) == len(word_counts)  # Same number of unique words returned
         assert "ab" in encoder.vocab
         assert Bigram("a", "b") in encoder.rules
 

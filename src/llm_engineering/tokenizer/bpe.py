@@ -210,30 +210,29 @@ class BytePairEncoder:
             max_vocab: Continue training till the vocabulary size reaches max_vocab.
             max_iter: Termination condition when max_vocab is not reached.
         """
-        # Flatten the corpus into a list of words
-        # The initial symbols are just characters.
-        corpus_words = list(
-            chain.from_iterable(
-                [self.pre_tokenize(text_chunk) for text_chunk in corpus]
-            )
-        )
+        word_counts: Counter[Word] = Counter()
+        for text_chunk in corpus:
+            word_counts.update(self.pre_tokenize(text_chunk))
 
-        # Initialize vocabulary if it's empty with all characters in the corpus.
         if len(self.vocab) == 0:
             self.vocab = [
                 self.unknown_token,
-                *list(BytePairEncoder.get_corpus_symbols(corpus_words)),
+                *BytePairEncoder.get_corpus_symbols(set(word_counts.keys())),
             ]
             logger.info("Initialized vocabulary with %d symbols", len(self.vocab))
 
-        # If there are existing rules, merge corpus symbols accordingly.
         if len(self.rules) > 0:
-            corpus_words = self.merge_symbols(corpus_words)
+            word_counts = Counter(
+                {
+                    word.merge_pairs(self.rules): count
+                    for word, count in word_counts.items()
+                }
+            )
 
         for _ in range(max_iter):
             if len(self.vocab) >= max_vocab:
                 return
-            corpus_words = self._train_step(corpus_words)
+            word_counts = self._train_step(word_counts)
             complete_percent = len(self.vocab) / max_vocab * 100
             logger.info("Training progress: %.2f%%", complete_percent)
 
@@ -245,45 +244,48 @@ class BytePairEncoder:
             max_vocab,
         )
 
-    def _train_step(self, corpus: list[Word]) -> list[Word]:
+    def _train_step(self, word_counts: Counter[Word]) -> Counter[Word]:
         """Learn a new merge rule from the corpus.
 
         Args:
-            corpus: The list of all words in the corpus.
+            word_counts: Counter of unique words with their frequencies.
 
         Returns:
-            The updated corpus with the new merge rule applied.
+            Updated word counts with the new merge rule applied.
         """
-        pair = BytePairEncoder.find_most_frequent_pair(corpus)
+        pair = BytePairEncoder.find_most_frequent_pair(word_counts)
         self.rules.append(pair)
         self.vocab.append(pair.merged)
 
-        return self.merge_symbols(corpus)
+        new_word_counts: Counter[Word] = Counter()
+        for word, count in word_counts.items():
+            merged_word = word.merge_pairs([pair])
+            new_word_counts[merged_word] += count
+        return new_word_counts
 
     @staticmethod
-    def get_corpus_symbols(corpus: list[Word]) -> set[Symbol]:
+    def get_corpus_symbols(words: set[Word]) -> set[Symbol]:
         """Get all symbols from a corpus.
 
         Args:
-            corpus: The list of all words in the whole corpus.
+            words: A set of unique words.
 
         Returns:
             All unique symbols in the corpus.
         """
-        corpus_symbols = chain.from_iterable([word.symbols for word in corpus])
+        corpus_symbols = chain.from_iterable([word.symbols for word in words])
         return set(corpus_symbols)
 
     @staticmethod
-    def find_most_frequent_pair(corpus: list[Word]) -> Bigram:
+    def find_most_frequent_pair(word_counts: Counter[Word]) -> Bigram:
         """Find the most frequent pair of adjacent symbols in a corpus.
 
         Args:
-            corpus: The list of words in the whole corpus.
+            word_counts: Counter of unique words with their frequencies.
 
         Returns:
             The most frequent pair of adjacent symbols.
         """
-        word_counts = BytePairEncoder.count_words(corpus)
         pair_counts = BytePairEncoder.count_bigrams(word_counts)
         return pair_counts.most_common(1)[0][0]
 
