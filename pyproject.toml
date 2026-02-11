@@ -36,4 +36,6 @@ convention = "google"
 "tests/**" = [
     "ANN201",  # require return type annotations
     "S101",  # prevent usage of assert
+    "SLF001",  # private member access
+    "PLR2004",  # magic value comparison
 ]

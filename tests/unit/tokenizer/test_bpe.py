@@ -3,6 +3,8 @@
 from collections import Counter
 from typing import TYPE_CHECKING
 
+import pytest
+
 from llm_engineering.tokenizer.bpe import (
     Bigram,
     BytePairEncoder,
@@ -214,7 +216,7 @@ class TestBytePairEncoderInstanceMethods:
         encoder = BytePairEncoder(end_token="</end>")  # noqa: S106
         result = encoder.pre_tokenize("hello world")
 
-        assert len(result) == 2  # noqa: PLR2004
+        assert len(result) == 2
         assert result[0].symbols == (*"hello", "</end>")
         assert result[1].symbols == (*"world", "</end>")
 
@@ -246,7 +248,7 @@ class TestBytePairEncoderInstanceMethods:
         ]
         result = encoder.merge_symbols(words)
 
-        assert len(result) == 2  # noqa: PLR2004
+        assert len(result) == 2
         assert result[0].symbols == ("ab", "c")
         assert result[1].symbols == ("x", "y", "z")  # No match
 
@@ -260,7 +262,7 @@ class TestBytePairEncoderInstanceMethods:
         initial_rules_count = len(encoder.rules)
         initial_vocab_count = len(encoder.vocab)
 
-        result = encoder._train_step(corpus)  # noqa: SLF001
+        result = encoder._train_step(corpus)
 
         assert len(encoder.rules) == initial_rules_count + 1
         assert len(encoder.vocab) == initial_vocab_count + 1
@@ -346,26 +348,26 @@ class TestBytePairEncoderInstanceMethods:
 
         # Step 1: Learn "ug" - appears 20 times (hug*10 + pug*5 + hugs*5)
         encoder.train(corpus, max_vocab=10)
-        assert len(encoder.vocab) == 10  # noqa: PLR2004
+        assert len(encoder.vocab) == 10
         assert "ug" in encoder.vocab
         assert Bigram("u", "g") in encoder.rules
 
         # Step 2: Learn "un" - appears 16 times (pun*12 + bun*4)
         encoder.train(corpus, max_vocab=11)
-        assert len(encoder.vocab) == 11  # noqa: PLR2004
+        assert len(encoder.vocab) == 11
         assert "un" in encoder.vocab
         assert Bigram("u", "n") in encoder.rules
 
         # Step 3: Learn "un</w>" - appears 16 times (pun*12 + bun*4)
         # Beats "hug" at 15 times (hug*10 + hugs*5)
         encoder.train(corpus, max_vocab=12)
-        assert len(encoder.vocab) == 12  # noqa: PLR2004
+        assert len(encoder.vocab) == 12
         assert "un</w>" in encoder.vocab
         assert Bigram("un", "</w>") in encoder.rules
 
         # Step 4: Learn "hug" - appears 15 times (hug*10 + hugs*5)
         encoder.train(corpus, max_vocab=13)
-        assert len(encoder.vocab) == 13  # noqa: PLR2004
+        assert len(encoder.vocab) == 13
         assert "hug" in encoder.vocab
         assert Bigram("h", "ug") in encoder.rules
 
@@ -375,6 +377,241 @@ class TestBytePairEncoderInstanceMethods:
             Bigram("un", "</w>"),
             Bigram("h", "ug"),
         ]
+
+    def test_token_to_id(self) -> None:
+        """Test token_to_id mapping and caching behavior."""
+        encoder = BytePairEncoder(
+            vocab=["<unk>", "a", "b", "c", "ab"],
+            end_token="</w>",  # noqa: S106
+            unknown_token="<unk>",  # noqa: S106
+        )
+
+        # Test cache is initially empty
+        assert len(encoder._token_to_id_cache) == 0
+
+        # Test correct IDs for known tokens
+        assert encoder.token_to_id("<unk>") == 0
+        assert encoder.token_to_id("a") == 1
+        assert encoder.token_to_id("b") == 2
+        assert encoder.token_to_id("c") == 3
+        assert encoder.token_to_id("ab") == 4
+
+        # Test cache is populated after lookups
+        assert len(encoder._token_to_id_cache) == 5
+        assert encoder._token_to_id_cache == {
+            "<unk>": 0,
+            "a": 1,
+            "b": 2,
+            "c": 3,
+            "ab": 4,
+        }
+
+        # Test subsequent calls use cache (no error, consistent results)
+        assert encoder.token_to_id("a") == 1
+        assert encoder.token_to_id("ab") == 4
+
+        # Test KeyError for unknown tokens
+        with pytest.raises(KeyError):
+            encoder.token_to_id("x")
+
+        # Test cache invalidation when vocab changes
+        encoder.vocab.append("d")
+        assert len(encoder._token_to_id_cache) == 5
+        assert encoder.token_to_id("d") == 5
+        assert len(encoder._token_to_id_cache) == 6
+        assert encoder._token_to_id_cache["d"] == 5
+
+    def test_id_to_token(self) -> None:
+        """Test id_to_token conversion with various edge cases."""
+        encoder = BytePairEncoder(
+            vocab=["<unk>", "a", "b", "c", "</w>"],
+            end_token="</w>",  # noqa: S106
+            unknown_token="<unk>",  # noqa: S106
+        )
+
+        # Test valid IDs
+        assert encoder.id_to_token(0) == "<unk>"
+        assert encoder.id_to_token(1) == "a"
+        assert encoder.id_to_token(2) == "b"
+        assert encoder.id_to_token(3) == "c"
+        assert encoder.id_to_token(4) == "</w>"
+
+        # Test IndexError for out-of-range positive ID
+        with pytest.raises(IndexError):
+            encoder.id_to_token(5)
+
+        # Test edge case: last valid ID
+        assert encoder.id_to_token(len(encoder.vocab) - 1) == "</w>"
+
+    def test_encode(self) -> None:
+        """Test encode method converting text to token IDs."""
+        # Test simple case: single word, no merge rules
+        encoder1 = BytePairEncoder(
+            vocab=["<unk>", "h", "e", "l", "o", "</w>"],
+            rules=[],
+            end_token="</w>",  # noqa: S106
+            unknown_token="<unk>",  # noqa: S106
+        )
+        result1 = encoder1.encode("hello")
+        assert result1 == [1, 2, 3, 3, 4, 5]
+
+        # Test multiple words
+        encoder2 = BytePairEncoder(
+            vocab=["<unk>", "h", "e", "l", "o", "w", "r", "d", "</w>"],
+            rules=[],
+            end_token="</w>",  # noqa: S106
+            unknown_token="<unk>",  # noqa: S106
+        )
+        result2 = encoder2.encode("hello world")
+        # hello: h=1, e=2, l=3, l=3, o=4, </w>=8
+        # world: w=5, o=4, r=6, l=3, d=7, </w>=8
+        assert result2 == [1, 2, 3, 3, 4, 8, 5, 4, 6, 3, 7, 8]
+
+        # Test with merge rules - "st" should merge and get ID of "st" token
+        encoder3 = BytePairEncoder(
+            vocab=["<unk>", "t", "e", "</w>", "st"],
+            rules=[Bigram("s", "t")],
+            end_token="</w>",  # noqa: S106
+            unknown_token="<unk>",  # noqa: S106
+        )
+        result3 = encoder3.encode("test")
+        # "test" with rule "st": t=1, e=2, st=4, </w>=3
+        assert result3 == [1, 2, 4, 3]
+
+        # Test unknown symbols replaced with unk token ID
+        encoder4 = BytePairEncoder(
+            vocab=["<unk>", "h", "e", "l", "</w>"],  # 'o' is not in vocab
+            rules=[],
+            end_token="</w>",  # noqa: S106
+            unknown_token="<unk>",  # noqa: S106
+        )
+        result4 = encoder4.encode("hello")
+        # h=1, e=2, l=3, l=3, o→<unk>=0, </w>=4
+        assert result4 == [1, 2, 3, 3, 0, 4]
+
+        # Test consistency: encode should equal tokenize + token_to_id
+        encoder5 = BytePairEncoder(
+            vocab=["<unk>", "a", "b", "c", "</w>"],
+            rules=[Bigram("a", "b")],
+            end_token="</w>",  # noqa: S106
+            unknown_token="<unk>",  # noqa: S106
+        )
+        text = "abc"
+        encoded = encoder5.encode(text)
+        tokenized = encoder5.tokenize(text)
+        manual_encoded = [encoder5.token_to_id(token) for token in tokenized]
+        assert encoded == manual_encoded
+
+    def test_decode(self) -> None:
+        """Test decode method converting token IDs to text."""
+        # Test simple single word
+        encoder1 = BytePairEncoder(
+            vocab=["<unk>", "h", "e", "l", "o", "</w>"],
+            rules=[],
+            end_token="</w>",  # noqa: S106
+            unknown_token="<unk>",  # noqa: S106
+        )
+        result1 = encoder1.decode([1, 2, 3, 3, 4, 5])
+        assert result1 == "hello "  # </w> becomes space
+
+        # Test multiple words (</w> between words becomes space)
+        encoder2 = BytePairEncoder(
+            vocab=["<unk>", "h", "e", "l", "o", "w", "r", "d", "</w>"],
+            rules=[],
+            end_token="</w>",  # noqa: S106
+            unknown_token="<unk>",  # noqa: S106
+        )
+        result2 = encoder2.decode([1, 2, 3, 3, 4, 8, 5, 4, 6, 3, 7, 8])
+        assert result2 == "hello world "
+
+        # Test with merged token
+        encoder3 = BytePairEncoder(
+            vocab=["<unk>", "t", "e", "</w>", "st"],
+            rules=[Bigram("s", "t")],
+            end_token="</w>",  # noqa: S106
+            unknown_token="<unk>",  # noqa: S106
+        )
+        result3 = encoder3.decode([1, 2, 4, 3])
+        assert result3 == "test "
+
+        # Test with unk token ID
+        encoder4 = BytePairEncoder(
+            vocab=["<unk>", "h", "e", "l", "</w>"],
+            rules=[],
+            end_token="</w>",  # noqa: S106
+            unknown_token="<unk>",  # noqa: S106
+        )
+        result4 = encoder4.decode([1, 2, 3, 3, 0, 4])
+        assert result4 == "hell<unk> "
+
+        # Test IndexError for out-of-range ID
+        with pytest.raises(IndexError):
+            encoder1.decode([1, 2, 99])
+
+        # Test empty list
+        result5 = encoder1.decode([])
+        assert result5 == ""
+
+    def test_encode_decode_roundtrip(self) -> None:
+        """Test encode followed by decode returns original text (with spacing)."""
+        # Test simple case
+        encoder1 = BytePairEncoder(
+            vocab=["<unk>", "h", "e", "l", "o", "</w>"],
+            rules=[],
+            end_token="</w>",  # noqa: S106
+            unknown_token="<unk>",  # noqa: S106
+        )
+        original1 = "hello"
+        encoded1 = encoder1.encode(original1)
+        decoded1 = encoder1.decode(encoded1)
+        assert decoded1 == "hello "  # Note: </w> becomes trailing space
+
+        # Test multiple words - need full vocab for "hello world"
+        encoder2 = BytePairEncoder(
+            vocab=["<unk>", "h", "e", "l", "o", "w", "r", "d", "</w>"],
+            rules=[],
+            end_token="</w>",  # noqa: S106
+            unknown_token="<unk>",  # noqa: S106
+        )
+        original2 = "hello world"
+        encoded2 = encoder2.encode(original2)
+        decoded2 = encoder2.decode(encoded2)
+        assert decoded2 == "hello world "
+
+        # Test with merge rules
+        encoder2 = BytePairEncoder(
+            vocab=["<unk>", "t", "e", "s", "</w>", "te", "es", "test"],
+            rules=[Bigram("t", "e"), Bigram("e", "s"), Bigram("te", "st")],
+            end_token="</w>",  # noqa: S106
+            unknown_token="<unk>",  # noqa: S106
+        )
+        original3 = "test"
+        encoded3 = encoder2.encode(original3)
+        decoded3 = encoder2.decode(encoded3)
+        assert decoded3 == "test "
+
+        # Test with unknown symbols
+        encoder3 = BytePairEncoder(
+            vocab=["<unk>", "a", "b", "</w>"],
+            rules=[],
+            end_token="</w>",  # noqa: S106
+            unknown_token="<unk>",  # noqa: S106
+        )
+        original4 = "abc"  # 'c' is unknown
+        encoded4 = encoder3.encode(original4)
+        decoded4 = encoder3.decode(encoded4)
+        assert decoded4 == "ab<unk> "
+
+        # Test roundtrip consistency
+        encoder4 = BytePairEncoder(
+            vocab=["<unk>", "t", "h", "i", "s", "</w>", "is"],
+            rules=[Bigram("i", "s")],
+            end_token="</w>",  # noqa: S106
+            unknown_token="<unk>",  # noqa: S106
+        )
+        text = "this is"
+        roundtrip = encoder4.decode(encoder4.encode(text))
+        assert roundtrip == "this is "
 
 
 class TestBytePairEncoderJSONRepository:
