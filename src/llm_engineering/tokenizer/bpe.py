@@ -252,55 +252,39 @@ class BytePairEncoder:
         """Learn a new merge rule from the corpus.
 
         Args:
-            word_counts: Counter of unique words with their frequencies.
-            pair_counts: Counter of bigram frequencies across all words.
+            word_counts: Counter of unique words with their frequencies (MUTATED).
+            pair_counts: Counter of bigram frequencies across all words (MUTATED).
 
         Returns:
-            Updated word counts and pair counts with the new merge rule applied.
+            The same word_counts and pair_counters objects passed in, modified in-place.
         """
         pair = pair_counts.most_common(1)[0][0]
         self.rules.append(pair)
         self.vocab.append(pair.merged)
 
-        new_word_counts: Counter[Word] = Counter()
-        new_pair_counts = pair_counts
+        changed_words: set[tuple[Word, Word]] = set()
+        pair_deltas: Counter[Bigram] = Counter()
         for word, count in word_counts.items():
             merged_word = word.merge_pairs([pair])
             if merged_word != word:
-                new_pair_counts = BytePairEncoder._update_pair_counts(
-                    new_pair_counts, word, merged_word, count
-                )
-            new_word_counts[merged_word] += count
-        return new_word_counts, new_pair_counts
+                changed_words.add((word, merged_word))
+                for p, cnt in word.count_pairs().items():
+                    pair_deltas[p] -= cnt * count
+                for p, cnt in merged_word.count_pairs().items():
+                    pair_deltas[p] += cnt * count
 
-    @staticmethod
-    def _update_pair_counts(
-        pair_counts: Counter[Bigram],
-        old_word: Word,
-        new_word: Word,
-        word_count: int,
-    ) -> Counter[Bigram]:
-        """Update pair counts incrementally when a symbol pair in a word is merged.
+        for original_word, merged_word in changed_words:
+            count = word_counts[original_word]
+            del word_counts[original_word]
+            word_counts[merged_word] += count
 
-        Args:
-            pair_counts: Counter of bigram frequencies (not modified).
-            old_word: The word before merging.
-            new_word: The word after merging.
-            word_count: The frequency of this word in the corpus.
+        pair_counts.update(pair_deltas)
 
-        Returns:
-            A new Counter with updated pair frequencies.
-        """
-        updated_pair_counts = pair_counts.copy()
-        for pair, cnt in old_word.count_pairs().items():
-            updated_pair_counts[pair] -= cnt * word_count
-            if updated_pair_counts[pair] == 0:
-                del updated_pair_counts[pair]
+        for pair in pair_deltas:
+            if pair_counts[pair] == 0:
+                del pair_counts[pair]
 
-        for pair, cnt in new_word.count_pairs().items():
-            updated_pair_counts[pair] += cnt * word_count
-
-        return updated_pair_counts
+        return word_counts, pair_counts
 
     @staticmethod
     def get_corpus_symbols(words: set[Word]) -> set[Symbol]:
