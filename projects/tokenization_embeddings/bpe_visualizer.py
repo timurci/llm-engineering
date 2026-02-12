@@ -75,11 +75,11 @@ if __name__ == "__main__":
     config = VisualConfig(
         colors=cycle(
             [
-                EscapeSequence("\033[41m"),
-                EscapeSequence("\033[42m"),
-                EscapeSequence("\033[44m"),
-                EscapeSequence("\033[43m"),
-                EscapeSequence("\033[45m"),
+                EscapeSequence("\033[30;41m"),
+                EscapeSequence("\033[30;42m"),
+                EscapeSequence("\033[30;44m"),
+                EscapeSequence("\033[30;43m"),
+                EscapeSequence("\033[30;45m"),
             ]
         ),
         override_tokens={encoder.end_token: " ", encoder.unknown_token: "?"},
@@ -87,9 +87,12 @@ if __name__ == "__main__":
 
     if args.interactive:
         logger.info("Press Ctrl+D or type 'exit' to exit")
-        while text := input(""):
-            if text == "exit":
-                break
-            print(enrich_text(text, encoder, config))  # noqa: T201
+        try:
+            while text := input(""):
+                if text == "exit":
+                    break
+                print(enrich_text(text, encoder, config))  # noqa: T201
+        except EOFError:
+            pass
     else:
         print(enrich_text(args.text, encoder, config))  # noqa: T201

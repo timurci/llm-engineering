@@ -9,7 +9,7 @@ from llm_engineering.tokenizer.bpe import BytePairEncoder, BytePairEncoderJSONRe
 
 DATASET_NAME = "wikitext"
 DATASET_CONFIG = "wikitext-2-raw-v1"
-MAX_VOCAB_SIZE = 2000
+MAX_VOCAB_SIZE = 10000
 OUTPUT_PATH = Path("models/bpe_tokenizer.gzip")
 
 logging.basicConfig(
