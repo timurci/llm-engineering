@@ -1,5 +1,6 @@
 """Byte Pair Encoder (BPE) implementation."""
 
+import gzip
 import json
 import logging
 from collections import Counter
@@ -375,34 +376,42 @@ class BytePairEncoderJSONRepository:
 
     @staticmethod
     def save(encoder: BytePairEncoder, path: Path) -> None:
-        """Save encoder to JSON file.
+        """Save encoder to compressed JSON file.
 
         Args:
             encoder: The BytePairEncoder to serialize.
-            path: Path to the output JSON file.
+            path: Path to the output compressed JSON file.
         """
+        vocab_to_id = {token: idx for idx, token in enumerate(encoder.vocab)}
         data = {
             "vocab": encoder.vocab,
-            "rules": [[r.left, r.right] for r in encoder.rules],
+            "rules": [
+                [vocab_to_id[r.left], vocab_to_id[r.right]] for r in encoder.rules
+            ],
             "end_token": encoder.end_token,
             "unknown_token": encoder.unknown_token,
         }
-        path.write_text(json.dumps(data, indent=2))
+        json_bytes = json.dumps(data, separators=(",", ":")).encode("utf-8")
+        compressed = gzip.compress(json_bytes)
+        path.write_bytes(compressed)
 
     @staticmethod
     def load(path: Path) -> BytePairEncoder:
-        """Load encoder from JSON file.
+        """Load encoder from compressed JSON file.
 
         Args:
-            path: Path to the input JSON file.
+            path: Path to the input compressed JSON file.
 
         Returns:
             A deserialized BytePairEncoder instance.
         """
-        data = json.loads(path.read_text())
-        rules = [Bigram(left=r[0], right=r[1]) for r in data["rules"]]
+        compressed = path.read_bytes()
+        json_bytes = gzip.decompress(compressed)
+        data = json.loads(json_bytes.decode("utf-8"))
+        vocab = data["vocab"]
+        rules = [Bigram(left=vocab[r[0]], right=vocab[r[1]]) for r in data["rules"]]
         return BytePairEncoder(
-            vocab=data["vocab"],
+            vocab=vocab,
             rules=rules,
             end_token=data["end_token"],
             unknown_token=data["unknown_token"],

@@ -12,3 +12,4 @@ uv.lock
 
 # Project output files
 projects/**/*.json
+projects/**/*.gzip

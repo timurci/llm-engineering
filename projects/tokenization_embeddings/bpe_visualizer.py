@@ -34,7 +34,10 @@ def _build_parser() -> ArgumentParser:
         "-i", "--interactive", action="store_true", help="Enable interactive mode"
     )
     parser.add_argument(
-        "-e", "--encoder", default="bpe_encoder.json", help="Path to BPE encoder file"
+        "-e",
+        "--encoder",
+        default="models/bpe_tokenizer.gzip",
+        help="Path to BPE encoder file",
     )
     return parser
 
