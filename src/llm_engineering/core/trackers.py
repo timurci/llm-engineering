@@ -3,6 +3,8 @@
 from enum import StrEnum
 from typing import TYPE_CHECKING, Any, Protocol, Self
 
+import mlflow
+
 if TYPE_CHECKING:
     from collections.abc import Mapping
     from logging import Logger
@@ -110,3 +112,52 @@ class StandardLoggingTracker(ExperimentTracker, ContextManager):
         exc_tb: TracebackType | None,
     ) -> None:
         """Exits the context."""
+
+
+class MLflowTracker(ExperimentTracker, ContextManager):
+    """An experiment tracker for MLflow."""
+
+    def __init__(
+        self,
+        experiment_name: str,
+        run_name: str | None = None,
+        tracking_uri: str | None = None,
+    ) -> None:
+        """Initializes a new MLflowTracker.
+
+        Args:
+            experiment_name: The name of the experiment.
+            run_name: The name of the run.
+            tracking_uri: The URI of the MLflow tracking server.
+        """
+        self.experiment_name = experiment_name
+        self.run_name = run_name
+        self.tracking_uri = tracking_uri
+
+    def log_params(self, params: Mapping[str, Any]) -> None:
+        """Logs the parameters of the current experiment run."""
+        mlflow.log_params(dict(params))  # type: ignore[possibly-missing-attribute]
+
+    def log_metrics(
+        self, phase: Phase, step: int, metrics: Mapping[str, float]
+    ) -> None:
+        """Logs the metrics of the current experiment run."""
+        prefixed_metrics = {f"{phase}/{key}": value for key, value in metrics.items()}
+        mlflow.log_metrics(prefixed_metrics, step=step)  # type: ignore[possibly-missing-attribute]
+
+    def __enter__(self) -> Self:
+        """Enters the context."""
+        if self.tracking_uri is not None:
+            mlflow.set_tracking_uri(self.tracking_uri)
+        mlflow.set_experiment(self.experiment_name)
+        mlflow.start_run(run_name=self.run_name)  # type: ignore[possibly-missing-attribute]
+        return self
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> None:
+        """Exits the context."""
+        mlflow.end_run()  # type: ignore[possibly-missing-attribute]

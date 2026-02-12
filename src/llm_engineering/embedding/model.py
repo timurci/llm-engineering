@@ -1,6 +1,6 @@
 """Embedding model for simple bigram next word prediction."""
 
-from typing import Protocol
+from typing import Protocol, Self
 
 import torch
 from torch import nn
@@ -25,11 +25,11 @@ class EmbeddingModel(Protocol):
         """
         ...
 
-    def train(self) -> None:
+    def train(self, mode: bool) -> Self:  # noqa: FBT001
         """Set model to training mode."""
         ...
 
-    def eval(self) -> None:
+    def eval(self) -> Self:
         """Set model to evaluation mode."""
         ...
 
