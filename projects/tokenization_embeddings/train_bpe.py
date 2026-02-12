@@ -12,7 +12,12 @@ DATASET_CONFIG = "wikitext-2-raw-v1"
 MAX_VOCAB_SIZE = 2000
 OUTPUT_PATH = Path("models/bpe_tokenizer.json")
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(
+    format="%(asctime)s | %(levelname)s:%(name)s | %(message)s",
+    level=logging.INFO,
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
+logging.getLogger("httpx").setLevel(logging.WARNING)
 
 
 def main() -> None:

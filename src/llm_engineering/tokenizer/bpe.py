@@ -219,7 +219,11 @@ class BytePairEncoder:
                 self.unknown_token,
                 *BytePairEncoder.get_corpus_symbols(set(word_counts.keys())),
             ]
-            logger.info("Initialized vocabulary with %d symbols", len(self.vocab))
+            logger.info(
+                "Initialized vocabulary with %d (%.2f%%) symbols",
+                len(self.vocab),
+                len(self.vocab) / max_vocab * 100,
+            )
 
         if len(self.rules) > 0:
             word_counts = Counter(
@@ -236,7 +240,8 @@ class BytePairEncoder:
                 return
             word_counts, pair_counts = self._train_step(word_counts, pair_counts)
             complete_percent = len(self.vocab) / max_vocab * 100
-            logger.info("Training progress: %.2f%%", complete_percent)
+            if complete_percent % 5 == 0:
+                logger.info("Training progress: %.2f%%", complete_percent)
 
         logger.warning(
             "Training reached maximum iterations without "
