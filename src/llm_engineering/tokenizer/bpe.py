@@ -263,28 +263,38 @@ class BytePairEncoder:
         self.vocab.append(pair.merged)
 
         changed_words: set[tuple[Word, Word]] = set()
-        pair_deltas: Counter[Bigram] = Counter()
-        for word, count in word_counts.items():
+        for word in word_counts:
             merged_word = word.merge_pairs([pair])
             if merged_word != word:
                 changed_words.add((word, merged_word))
-                for p, cnt in word.count_pairs().items():
-                    pair_deltas[p] -= cnt * count
-                for p, cnt in merged_word.count_pairs().items():
-                    pair_deltas[p] += cnt * count
 
         for original_word, merged_word in changed_words:
             count = word_counts[original_word]
+            for p, cnt in original_word.count_pairs().items():
+                BytePairEncoder._update_pair_count(pair_counts, p, -cnt * count)
+            for p, cnt in merged_word.count_pairs().items():
+                BytePairEncoder._update_pair_count(pair_counts, p, cnt * count)
             del word_counts[original_word]
             word_counts[merged_word] += count
 
-        pair_counts.update(pair_deltas)
-
-        for pair in pair_deltas:
-            if pair_counts[pair] == 0:
-                del pair_counts[pair]
-
         return word_counts, pair_counts
+
+    @staticmethod
+    def _update_pair_count(
+        pair_counts: Counter[Bigram], pair: Bigram, delta: int
+    ) -> None:
+        """Update pair count, removing entry if count drops to zero or below.
+
+        Args:
+            pair_counts: Counter of bigram frequencies (MUTATED).
+            pair: The bigram to update.
+            delta: The change in count (positive or negative).
+        """
+        new_count = pair_counts[pair] + delta
+        if new_count <= 0:
+            del pair_counts[pair]
+        else:
+            pair_counts[pair] = new_count
 
     @staticmethod
     def get_corpus_symbols(words: set[Word]) -> set[Symbol]:
