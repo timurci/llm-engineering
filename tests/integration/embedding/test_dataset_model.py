@@ -13,10 +13,10 @@ class TestDatasetModelIntegration:
         """Test model produces correct output shape from dataset batch."""
         vocab_size = 100
         embedding_dim = 16
-        tokens = [1, 2, 3, 4, 5, 6, 7, 8]
+        chunks = [[1, 2, 3, 4, 5, 6, 7, 8]]
         batch_size = 2
 
-        dataset = BigramEmbeddingDataset(tokens)
+        dataset = BigramEmbeddingDataset(chunks)
         dataloader = DataLoader(dataset, batch_size=batch_size, drop_last=True)
         model = BigramEmbeddingModel(vocab_size=vocab_size, embedding_dim=embedding_dim)
 
@@ -29,9 +29,9 @@ class TestDatasetModelIntegration:
         """Test model handles different batch sizes correctly."""
         vocab_size = 100
         embedding_dim = 16
-        tokens = list(range(1, 21))
+        chunks = [list(range(1, 21))]
 
-        dataset = BigramEmbeddingDataset(tokens)
+        dataset = BigramEmbeddingDataset(chunks)
         model = BigramEmbeddingModel(vocab_size=vocab_size, embedding_dim=embedding_dim)
 
         for batch_size in [1, 3, 5, 7]:
@@ -44,10 +44,10 @@ class TestDatasetModelIntegration:
         """Test embedding layer receives input within vocab range."""
         vocab_size = 100
         embedding_dim = 16
-        tokens = [0, 1, 2, 50, 99, 0, 99, 50]
+        chunks = [[0, 1, 2, 50, 99, 0, 99, 50]]
         batch_size = 2
 
-        dataset = BigramEmbeddingDataset(tokens)
+        dataset = BigramEmbeddingDataset(chunks)
         dataloader = DataLoader(dataset, batch_size=batch_size)
         model = BigramEmbeddingModel(vocab_size=vocab_size, embedding_dim=embedding_dim)
 

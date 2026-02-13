@@ -16,10 +16,10 @@ class TestModelTraining:
         """Test a single training step completes without error."""
         vocab_size = 50
         embedding_dim = 8
-        tokens = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+        chunks = [[1, 2, 3, 4, 5, 6, 7, 8, 9, 10]]
         batch_size = 2
 
-        dataset = BigramEmbeddingDataset(tokens)
+        dataset = BigramEmbeddingDataset(chunks)
         dataloader = DataLoader(dataset, batch_size=batch_size)
         model = BigramEmbeddingModel(vocab_size=vocab_size, embedding_dim=embedding_dim)
         optimizer = SGD(model.parameters(), lr=0.01)
@@ -42,10 +42,10 @@ class TestModelTraining:
         """Test model can be trained to predict next token."""
         vocab_size = 10
         embedding_dim = 8
-        tokens = [1, 2, 3, 4, 1, 2, 3, 4, 1, 2, 3, 4]
+        chunks = [[1, 2, 3, 4, 1, 2, 3, 4, 1, 2, 3, 4]]
         batch_size = 4
 
-        dataset = BigramEmbeddingDataset(tokens)
+        dataset = BigramEmbeddingDataset(chunks)
         dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
         model = BigramEmbeddingModel(vocab_size=vocab_size, embedding_dim=embedding_dim)
         optimizer = SGD(model.parameters(), lr=0.1)

@@ -45,7 +45,7 @@ def _build_parser() -> ArgumentParser:
     return parser
 
 
-def encode_dataset(dataset: Dataset, tokenizer: BytePairEncoder) -> list[int]:
+def encode_dataset(dataset: Dataset, tokenizer: BytePairEncoder) -> list[list[int]]:
     """Encode a dataset using a BPE tokenizer.
 
     Args:
@@ -53,13 +53,13 @@ def encode_dataset(dataset: Dataset, tokenizer: BytePairEncoder) -> list[int]:
         tokenizer: The BPE tokenizer to use.
 
     Returns:
-        A list of token IDs.
+        A list of token ID chunks, one per sample.
     """
-    all_tokens: list[int] = []
-    for sample in tqdm(dataset, desc="Encoding", leave=False):
-        if sample["text"]:
-            all_tokens.extend(tokenizer.encode(sample["text"]))
-    return all_tokens
+    return [
+        tokenizer.encode(sample["text"])
+        for sample in tqdm(dataset, desc="Encoding", leave=False)
+        if sample["text"]
+    ]
 
 
 def main() -> None:
@@ -78,17 +78,17 @@ def main() -> None:
     val_dataset = load_dataset(DATASET_NAME, DATASET_CONFIG, split="validation")
 
     logger.info("Encoding training data")
-    train_tokens = encode_dataset(train_dataset, tokenizer)
-    logger.info("Training tokens: %d", len(train_tokens))
+    train_chunks = encode_dataset(train_dataset, tokenizer)
+    logger.info("Training chunks: %d", len(train_chunks))
 
     logger.info("Encoding validation data")
-    val_tokens = encode_dataset(val_dataset, tokenizer)
-    logger.info("Validation tokens: %d", len(val_tokens))
+    val_chunks = encode_dataset(val_dataset, tokenizer)
+    logger.info("Validation chunks: %d", len(val_chunks))
 
     tokenizer.set_merge_cache(size=0)
 
-    train_data = BigramEmbeddingDataset(train_tokens)
-    val_data = BigramEmbeddingDataset(val_tokens)
+    train_data = BigramEmbeddingDataset(train_chunks)
+    val_data = BigramEmbeddingDataset(val_chunks)
 
     train_loader = DataLoader(train_data, batch_size=BATCH_SIZE, shuffle=True)
     val_loader = DataLoader(val_data, batch_size=BATCH_SIZE, shuffle=False)
