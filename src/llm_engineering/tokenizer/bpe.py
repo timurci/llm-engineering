@@ -3,9 +3,10 @@
 import gzip
 import json
 import logging
-from collections import Counter
+from collections import Counter, OrderedDict
 from dataclasses import dataclass
 from itertools import chain
+from math import ceil
 from typing import TYPE_CHECKING, NamedTuple
 
 if TYPE_CHECKING:
@@ -134,6 +135,10 @@ class BytePairEncoder:
         self.rules = [] if rules is None else rules
         self.unknown_token = unknown_token
         self.end_token = end_token
+        self._merge_cache: OrderedDict[tuple[Symbol, ...], Word] = OrderedDict()
+        self._merge_cache_size: int = 0
+        self._merge_eviction_count: int = 0
+        self._merge_eviction_threshold: int = 10
 
         if vocab is not None and unknown_token not in vocab:
             logger.warning(
@@ -142,6 +147,52 @@ class BytePairEncoder:
                 unknown_token,
             )
             self.vocab.append(unknown_token)
+
+    @property
+    def _merge_cache_frozen(self) -> bool:
+        return (
+            self._merge_cache_size == 0
+            or self._merge_eviction_count >= self._merge_eviction_threshold
+        )
+
+    def set_merge_cache(self, size: int, eviction_threshold: int = 10) -> None:
+        """Configure the merge cache for encoding optimization.
+
+        Args:
+            size: Maximum number of words to cache (0 to disable).
+            eviction_threshold: Max evictions before cache becomes fixed.
+        """
+        self._merge_cache_size = size
+        self._merge_eviction_threshold = eviction_threshold
+        self._merge_cache.clear()
+        self._merge_eviction_count = 0
+
+    def _merge_cache_get(self, word: Word) -> Word | None:
+        key = word.symbols
+        if key in self._merge_cache:
+            if not self._merge_cache_frozen:
+                self._merge_cache.move_to_end(key)
+            return self._merge_cache[key]
+        return None
+
+    def _merge_cache_put(self, word: Word, merged: Word) -> None:
+        if self._merge_cache_frozen:
+            return
+        key = word.symbols
+        if key in self._merge_cache:
+            return
+        if len(self._merge_cache) >= self._merge_cache_size:
+            self._merge_cache_evict()
+            if self._merge_cache_frozen:
+                return
+        self._merge_cache[key] = merged
+
+    def _merge_cache_evict(self) -> None:
+        evict_count = ceil(self._merge_cache_size * 0.05)
+        for _ in range(evict_count):
+            if self._merge_cache:
+                self._merge_cache.popitem(last=False)
+        self._merge_eviction_count += 1
 
     def __len__(self) -> int:
         """Return the size of the vocabulary."""
@@ -342,7 +393,16 @@ class BytePairEncoder:
         Args:
             words: A list of words to merge symbols in.
         """
-        return [word.merge_pairs(self.rules) for word in words]
+        result = []
+        for word in words:
+            cached = self._merge_cache_get(word)
+            if cached is not None:
+                result.append(cached)
+            else:
+                merged = word.merge_pairs(self.rules)
+                self._merge_cache_put(word, merged)
+                result.append(merged)
+        return result
 
     @staticmethod
     def count_words(words: list[Word]) -> Counter[Word]:

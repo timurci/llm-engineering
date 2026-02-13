@@ -615,6 +615,232 @@ class TestBytePairEncoderInstanceMethods:
         assert roundtrip == "this is "
 
 
+class TestBytePairEncoderPrivateMethods:
+    """Tests for BytePairEncoder private methods."""
+
+    def test_merge_cache_frozen_when_disabled(self) -> None:
+        """Test cache is frozen when size is set to 0 (disabled)."""
+        encoder = BytePairEncoder()
+        encoder.set_merge_cache(size=0)
+        assert encoder._merge_cache_frozen is True
+
+    def test_merge_cache_frozen_after_eviction_threshold(self) -> None:
+        """Test cache becomes frozen after eviction threshold is reached."""
+        encoder = BytePairEncoder()
+        encoder.set_merge_cache(size=100, eviction_threshold=2)
+        encoder._merge_eviction_count = 2
+        assert encoder._merge_cache_frozen is True
+
+    def test_merge_cache_not_frozen_when_active(self) -> None:
+        """Test cache is not frozen when active with evictions below threshold."""
+        encoder = BytePairEncoder()
+        encoder.set_merge_cache(size=100, eviction_threshold=10)
+        encoder._merge_eviction_count = 5
+        assert encoder._merge_cache_frozen is False
+
+    def test_set_merge_cache_configures_settings(self) -> None:
+        """Test set_merge_cache properly configures cache settings."""
+        encoder = BytePairEncoder()
+        encoder.set_merge_cache(size=500, eviction_threshold=20)
+        assert encoder._merge_cache_size == 500
+        assert encoder._merge_eviction_threshold == 20
+        assert len(encoder._merge_cache) == 0
+        assert encoder._merge_eviction_count == 0
+
+    def test_set_merge_cache_clears_existing_state(self) -> None:
+        """Test set_merge_cache clears existing cache and resets eviction count."""
+        encoder = BytePairEncoder()
+        encoder.set_merge_cache(size=100)
+        encoder._merge_cache[("a", "b")] = Word(symbols=("ab",))
+        encoder._merge_eviction_count = 5
+
+        encoder.set_merge_cache(size=200, eviction_threshold=15)
+        assert len(encoder._merge_cache) == 0
+        assert encoder._merge_eviction_count == 0
+        assert encoder._merge_cache_size == 200
+        assert encoder._merge_eviction_threshold == 15
+
+    def test_merge_cache_get_returns_none_for_miss(self) -> None:
+        """Test _merge_cache_get returns None for cache miss."""
+        encoder = BytePairEncoder()
+        encoder.set_merge_cache(size=100)
+        word = Word(symbols=("a", "b", "c"))
+        assert encoder._merge_cache_get(word) is None
+
+    def test_merge_cache_get_returns_cached_word(self) -> None:
+        """Test _merge_cache_get returns cached merged word on hit."""
+        encoder = BytePairEncoder()
+        encoder.set_merge_cache(size=100)
+        word = Word(symbols=("a", "b", "c"))
+        merged = Word(symbols=("ab", "c"))
+        encoder._merge_cache[word.symbols] = merged
+
+        result = encoder._merge_cache_get(word)
+        assert result == merged
+
+    def test_merge_cache_get_moves_to_end_when_not_frozen(self) -> None:
+        """Test _merge_cache_get moves key to end for LRU when not frozen."""
+        encoder = BytePairEncoder()
+        encoder.set_merge_cache(size=100)
+        word1 = Word(symbols=("a", "b"))
+        word2 = Word(symbols=("c", "d"))
+        encoder._merge_cache[word1.symbols] = Word(symbols=("ab",))
+        encoder._merge_cache[word2.symbols] = Word(symbols=("cd",))
+
+        keys_before = list(encoder._merge_cache.keys())
+        assert keys_before == [("a", "b"), ("c", "d")]
+
+        encoder._merge_cache_get(word1)
+
+        keys_after = list(encoder._merge_cache.keys())
+        assert keys_after == [("c", "d"), ("a", "b")]
+
+    def test_merge_cache_get_does_not_move_when_frozen(self) -> None:
+        """Test _merge_cache_get does not move key when cache is frozen."""
+        encoder = BytePairEncoder()
+        encoder.set_merge_cache(size=100)
+        word1 = Word(symbols=("a", "b"))
+        word2 = Word(symbols=("c", "d"))
+        encoder._merge_cache[word1.symbols] = Word(symbols=("ab",))
+        encoder._merge_cache[word2.symbols] = Word(symbols=("cd",))
+
+        encoder._merge_eviction_count = encoder._merge_eviction_threshold
+        assert encoder._merge_cache_frozen is True
+
+        keys_before = list(encoder._merge_cache.keys())
+        encoder._merge_cache_get(word1)
+        keys_after = list(encoder._merge_cache.keys())
+
+        assert keys_before == keys_after
+
+    def test_merge_cache_put_adds_when_not_frozen(self) -> None:
+        """Test _merge_cache_put adds word to cache when not frozen."""
+        encoder = BytePairEncoder()
+        encoder.set_merge_cache(size=100)
+        word = Word(symbols=("a", "b"))
+        merged = Word(symbols=("ab",))
+
+        encoder._merge_cache_put(word, merged)
+
+        assert encoder._merge_cache[word.symbols] == merged
+
+    def test_merge_cache_put_does_nothing_when_frozen(self) -> None:
+        """Test _merge_cache_put does nothing when cache is frozen."""
+        encoder = BytePairEncoder()
+        encoder.set_merge_cache(size=0)
+        word = Word(symbols=("a", "b"))
+        merged = Word(symbols=("ab",))
+
+        encoder._merge_cache_put(word, merged)
+
+        assert len(encoder._merge_cache) == 0
+
+    def test_merge_cache_put_does_not_duplicate_keys(self) -> None:
+        """Test _merge_cache_put does not add duplicate keys."""
+        encoder = BytePairEncoder()
+        encoder.set_merge_cache(size=100)
+        word = Word(symbols=("a", "b"))
+        merged1 = Word(symbols=("ab",))
+        merged2 = Word(symbols=("AB",))
+
+        encoder._merge_cache_put(word, merged1)
+        encoder._merge_cache_put(word, merged2)
+
+        assert len(encoder._merge_cache) == 1
+        assert encoder._merge_cache[word.symbols] == merged1
+
+    def test_merge_cache_put_triggers_eviction_when_full(self) -> None:
+        """Test _merge_cache_put triggers eviction when cache is full."""
+        encoder = BytePairEncoder()
+        encoder.set_merge_cache(size=3, eviction_threshold=10)
+
+        for i in range(3):
+            word = Word(symbols=(str(i),))
+            merged = Word(symbols=(f"m{i}",))
+            encoder._merge_cache_put(word, merged)
+
+        assert len(encoder._merge_cache) == 3
+        assert encoder._merge_eviction_count == 0
+
+        word4 = Word(symbols=("4",))
+        merged4 = Word(symbols=("m4",))
+        encoder._merge_cache_put(word4, merged4)
+
+        assert encoder._merge_eviction_count == 1
+
+    def test_merge_cache_evict_removes_oldest_five_percent(self) -> None:
+        """Test _merge_cache_evict removes oldest 5% of entries using ceil."""
+        encoder = BytePairEncoder()
+        encoder.set_merge_cache(size=100, eviction_threshold=10)
+
+        for i in range(100):
+            word = Word(symbols=(str(i),))
+            merged = Word(symbols=(f"m{i}",))
+            encoder._merge_cache[word.symbols] = merged
+
+        keys_before = list(encoder._merge_cache.keys())
+        assert len(keys_before) == 100
+        assert keys_before[0] == ("0",)
+
+        encoder._merge_cache_evict()
+
+        keys_after = list(encoder._merge_cache.keys())
+        assert len(keys_after) == 95
+        assert ("0",) not in keys_after
+        assert encoder._merge_eviction_count == 1
+
+    def test_merge_cache_evict_small_cache(self) -> None:
+        """Test _merge_cache_evict with small cache (ceil rounds up)."""
+        encoder = BytePairEncoder()
+        encoder.set_merge_cache(size=5, eviction_threshold=10)
+
+        for i in range(5):
+            word = Word(symbols=(str(i),))
+            merged = Word(symbols=(f"m{i}",))
+            encoder._merge_cache[word.symbols] = merged
+
+        encoder._merge_cache_evict()
+
+        assert len(encoder._merge_cache) == 4
+
+    def test_merge_symbols_uses_cache(self) -> None:
+        """Test merge_symbols uses cache for repeated words."""
+        encoder = BytePairEncoder(rules=[Bigram("a", "b")])
+        encoder.set_merge_cache(size=100)
+
+        word = Word(symbols=("a", "b", "c"))
+        words = [word, word]
+
+        result = encoder.merge_symbols(words)
+
+        assert result[0] == Word(symbols=("ab", "c"))
+        assert result[1] == Word(symbols=("ab", "c"))
+        assert len(encoder._merge_cache) == 1
+
+    def test_merge_cache_freezes_after_eviction_threshold(self) -> None:
+        """Test full cache lifecycle: fill, evict, then freeze."""
+        encoder = BytePairEncoder(rules=[Bigram("a", "b")])
+        encoder.set_merge_cache(size=3, eviction_threshold=1)
+
+        for i in range(3):
+            word = Word(symbols=(str(i), "b"))
+            encoder.merge_symbols([word])
+
+        assert encoder._merge_eviction_count == 0
+        assert encoder._merge_cache_frozen is False
+
+        word4 = Word(symbols=("4", "b"))
+        encoder.merge_symbols([word4])
+
+        assert encoder._merge_eviction_count == 1
+        assert encoder._merge_cache_frozen is True
+
+        word5 = Word(symbols=("5", "b"))
+        encoder.merge_symbols([word5])
+
+        assert len(encoder._merge_cache) == 2
+
+
 class TestBytePairEncoderJSONRepository:
     """Tests for BytePairEncoderJSONRepository."""
 

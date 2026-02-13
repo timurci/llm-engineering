@@ -71,6 +71,8 @@ def main() -> None:
     vocab_size = len(tokenizer)
     logger.info("Vocabulary size: %d", vocab_size)
 
+    tokenizer.set_merge_cache(size=5000, eviction_threshold=50)
+
     logger.info("Loading dataset %s/%s", DATASET_NAME, DATASET_CONFIG)
     train_dataset = load_dataset(DATASET_NAME, DATASET_CONFIG, split="train")
     val_dataset = load_dataset(DATASET_NAME, DATASET_CONFIG, split="validation")
@@ -82,6 +84,8 @@ def main() -> None:
     logger.info("Encoding validation data")
     val_tokens = encode_dataset(val_dataset, tokenizer)
     logger.info("Validation tokens: %d", len(val_tokens))
+
+    tokenizer.set_merge_cache(size=0)
 
     train_data = BigramEmbeddingDataset(train_tokens)
     val_data = BigramEmbeddingDataset(val_tokens)
