@@ -33,6 +33,8 @@ class Word:
         Returns:
             A new Word object with the merged symbols.
         """
+        if len(self) <= 1:
+            return Word(self.symbols)
         symbols = list(self.symbols)
         for rule in rules:
             new_symbols: list[Symbol] = []
@@ -49,6 +51,8 @@ class Word:
                     new_symbols.append(symbols[index])
                     index += 1
             symbols = new_symbols
+            if len(symbols) == 1:
+                break
         return Word(tuple(symbols))
 
     def replace_missing_symbols(
@@ -395,6 +399,9 @@ class BytePairEncoder:
         """
         result = []
         for word in words:
+            if len(word) <= 1:
+                result.append(word.merge_pairs(self.rules))
+                continue
             cached = self._merge_cache_get(word)
             if cached is not None:
                 result.append(cached)
