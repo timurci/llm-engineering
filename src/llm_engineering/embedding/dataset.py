@@ -2,6 +2,7 @@
 
 from typing import TYPE_CHECKING, NamedTuple
 
+import torch
 from torch.utils.data import Dataset
 
 if TYPE_CHECKING:
@@ -11,8 +12,8 @@ if TYPE_CHECKING:
 class TokenIndexBigram(NamedTuple):
     """Bigram representation of token indices."""
 
-    left: int
-    right: int
+    left: torch.Tensor
+    right: torch.Tensor
 
 
 class BigramEmbeddingDataset(Dataset[TokenIndexBigram]):
@@ -28,7 +29,8 @@ class BigramEmbeddingDataset(Dataset[TokenIndexBigram]):
 
     def __len__(self) -> int:
         """Return the number of bigram tokens in the dataset."""
-        return len(self.tokens) - 1
+        length = len(self.tokens) - 1
+        return max(0, length)
 
     def __getitem__(self, index: int) -> TokenIndexBigram:
         """Return the token at the given index and the next token.
@@ -39,6 +41,6 @@ class BigramEmbeddingDataset(Dataset[TokenIndexBigram]):
         Returns:
             Token indices as a named tuple.
         """
-        left = self.tokens[index]
-        right = self.tokens[index + 1]
+        left = torch.tensor(self.tokens[index], dtype=torch.long)
+        right = torch.tensor(self.tokens[index + 1], dtype=torch.long)
         return TokenIndexBigram(left=left, right=right)

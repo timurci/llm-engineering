@@ -76,8 +76,8 @@ class BigramEmbeddingTrainer:
         for batch in loader:
             self.optimizer.zero_grad()
 
-            inputs = batch["left"].to(device)
-            targets = batch["right"].to(device)
+            inputs = batch.left.to(device)
+            targets = batch.right.to(device)
             outputs = self.model(inputs)
 
             loss = self.loss_fn(outputs, targets)

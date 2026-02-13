@@ -18,14 +18,14 @@ class EmbeddingModel(Protocol):
         """Forward pass of the embedding model.
 
         Args:
-            x (torch.Tensor): Input tensor of shape (batch_size, 1).
+            x (torch.Tensor): Input tensor of shape (batch_size,).
 
         Returns:
             torch.Tensor: Output tensor of shape (batch_size, vocab_size).
         """
         ...
 
-    def train(self, mode: bool) -> Self:  # noqa: FBT001
+    def train(self, mode: bool = True) -> Self:  # noqa: FBT001, FBT002
         """Set model to training mode."""
         ...
 
@@ -41,7 +41,7 @@ class BigramEmbeddingModel(nn.Module):
         self,
         vocab_size: int,
         embedding_dim: int,
-        sparse: bool = True,  # noqa: FBT001, FBT002
+        sparse: bool = False,  # noqa: FBT001, FBT002
     ) -> None:
         """Initialize the embedding model.
 
@@ -58,7 +58,7 @@ class BigramEmbeddingModel(nn.Module):
         """Forward pass of the embedding model.
 
         Args:
-            x (torch.Tensor): Input tensor of shape (batch_size, vocab_size).
+            x (torch.Tensor): Input tensor of shape (batch_size,).
 
         Returns:
             torch.Tensor: Output tensor of shape (batch_size, vocab_size).
