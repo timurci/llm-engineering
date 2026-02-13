@@ -69,8 +69,8 @@ class TestBigramEmbeddingDataset:
 
         bigram = dataset[0]
 
-        assert bigram.left.dtype == torch.long
-        assert bigram.right.dtype == torch.long
+        assert bigram.left.dtype == torch.int
+        assert bigram.right.dtype == torch.int
 
     def test_dataloader_batch_shapes(self) -> None:
         """Test DataLoader produces batches with shape (batch_size,)."""

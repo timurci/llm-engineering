@@ -41,6 +41,6 @@ class BigramEmbeddingDataset(Dataset[TokenIndexBigram]):
         Returns:
             Token indices as a named tuple.
         """
-        left = torch.tensor(self.tokens[index], dtype=torch.long)
-        right = torch.tensor(self.tokens[index + 1], dtype=torch.long)
+        left = torch.tensor(self.tokens[index], dtype=torch.int)
+        right = torch.tensor(self.tokens[index + 1], dtype=torch.int)
         return TokenIndexBigram(left=left, right=right)
