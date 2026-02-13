@@ -13,6 +13,7 @@ uv.lock
 # Project output files
 projects/**/*.json
 projects/**/*.gzip
+projects/**/*.pt
 
 # MLflow
 mlflow.db

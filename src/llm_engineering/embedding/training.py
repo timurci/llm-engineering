@@ -1,5 +1,6 @@
 """Training module for embedding model."""
 
+import math
 from typing import TYPE_CHECKING, NamedTuple, Protocol
 
 import torch
@@ -30,11 +31,12 @@ class LossFunction(Protocol):
         ...
 
 
-class ClassificationScore(NamedTuple):
+class PredictionScore(NamedTuple):
     """Classification metrics for one epoch."""
 
     loss: float
     accuracy: float
+    perplexity: float
 
 
 class BigramEmbeddingTrainer:
@@ -59,7 +61,7 @@ class BigramEmbeddingTrainer:
 
     def _train_epoch(
         self, loader: DataLoader[TokenIndexBigram], device: torch.device
-    ) -> ClassificationScore:
+    ) -> PredictionScore:
         """Run training loop for one epoch.
 
         Args:
@@ -84,17 +86,19 @@ class BigramEmbeddingTrainer:
             loss.backward()
             self.optimizer.step()
 
-            total_loss += loss.item()
+            batch_size = inputs.size(0)
+            total_loss += loss.item() * batch_size
             total_correct += (outputs.argmax(dim=1) == targets).sum().item()
-            total_samples += inputs.size(0)
-        return ClassificationScore(
+            total_samples += batch_size
+        return PredictionScore(
             loss=(total_loss / total_samples),
             accuracy=(total_correct / total_samples),
+            perplexity=math.exp(total_loss / total_samples),
         )
 
     def _validate_epoch(
         self, loader: DataLoader[TokenIndexBigram], device: torch.device
-    ) -> ClassificationScore:
+    ) -> PredictionScore:
         """Run validation loop for one epoch.
 
         Args:
@@ -110,17 +114,19 @@ class BigramEmbeddingTrainer:
         total_samples = 0
         with torch.inference_mode():
             for batch in loader:
-                inputs = batch["left"].to(device)
-                targets = batch["right"].to(device)
+                inputs = batch.left.to(device)
+                targets = batch.right.to(device)
                 outputs = self.model(inputs)
 
                 loss = self.loss_fn(outputs, targets)
-                total_loss += loss.item()
+                batch_size = inputs.size(0)
+                total_loss += loss.item() * batch_size
                 total_correct += (outputs.argmax(dim=1) == targets).sum().item()
-                total_samples += inputs.size(0)
-        return ClassificationScore(
+                total_samples += batch_size
+        return PredictionScore(
             loss=(total_loss / total_samples),
             accuracy=(total_correct / total_samples),
+            perplexity=math.exp(total_loss / total_samples),
         )
 
     def train(

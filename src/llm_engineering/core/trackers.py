@@ -99,7 +99,7 @@ class StandardLoggingTracker(ExperimentTracker, ContextManager):
         metrics_format = ", ".join(
             f"({key}, {value:.4f})" for key, value in metrics.items()
         )
-        self.logger.info("(%s, %d): %s", phase, step, metrics_format)
+        self.logger.info("(%-5s, %d): %s", phase, step, metrics_format)
 
     def __enter__(self) -> Self:
         """Enters the context."""
