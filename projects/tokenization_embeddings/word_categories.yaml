@@ -1,0 +1,37 @@
+word_categories:
+  Related Nouns:
+    - dog
+    - animal
+    - bird
+    - fish
+    - horse
+    - lion
+  Adjectives:
+    - happy
+    - sad
+    - blue
+    - red
+    - green
+    - yellow
+    - orange
+  Function Words:
+    - the
+    - is
+    - of
+    - to
+    - in
+    - "on"
+    - at
+    - and
+  Verbs:
+    - run
+    - walk
+    - jump
+    - swim
+    - eat
+
+category_colors:
+  Related Nouns: "#2ecc71"
+  Adjectives: "#C04CFD"
+  Function Words: "#3498db"
+  Verbs: "#e74c3c"
