@@ -1,3 +1,5 @@
+# This file is provided for visualize_embeddings.py
+
 word_categories:
   Related Nouns:
     - dog
