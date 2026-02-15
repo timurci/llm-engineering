@@ -8,11 +8,11 @@ This repository consists of a collection of my implementations to an llm enginee
 
 The following is an incomplete version of the composed [list](https://x.com/TheAhmadOsman/status/2011033609856303464).
 
-1. Tokenization & embeddings (**in progress**)
+1. Tokenization & embeddings ([README](projects/tokenization_embeddings/README.md))
     - Build a byte-pair encoder to train your own subword vocabulary
     - Implement a token visualizer to map chunks to IDs
     - One-hot encoding vs learned embeddings, plot cosine distances
-2. Positional embeddings
+2. Positional embeddings (**in progress**)
     - Implement four demos: classic sinusoidal vs learned vs RoPE vs ALiBi
     - Animate a toy sequence being position-encoded in 3D
     - Ablate positions to see the attention collapse
